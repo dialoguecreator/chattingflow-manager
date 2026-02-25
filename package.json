@@ -1,0 +1,14 @@
+{
+  "name": "of-mgmt-bot",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": ["discord-bot", "web"],
+  "scripts": {
+    "dev:bot": "cd discord-bot && npx tsx watch src/index.ts",
+    "dev:web": "cd web && npm run dev",
+    "deploy-commands": "cd discord-bot && npx tsx src/deploy-commands.ts",
+    "db:push": "cd web && npx prisma db push",
+    "db:studio": "cd web && npx prisma studio",
+    "db:seed": "cd web && npx tsx prisma/seed.ts"
+  }
+}

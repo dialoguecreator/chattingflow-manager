@@ -1,0 +1,301 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users & Auth ─────────────────────────────────────────
+model User {
+  id              Int      @id @default(autoincrement())
+  email           String   @unique
+  username        String   @unique
+  password        String
+  firstName       String
+  lastName        String
+  role            String   @default("CHATTER") // FOUNDER, ADMIN, MANAGER, FINANCE_MANAGER, SUPERVISOR, CHATTER, MASS_PPV_ENGINEER
+  commissionNet   Float    @default(5.0)  // 5% net
+  commissionGross Float    @default(4.0)  // 4% gross (net * 0.8)
+  discordId       String?  @unique
+  discordUsername  String?
+  inviteToken     String?  // null = activated
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  clockRecords       ClockRecord[]
+  invoices           Invoice[]
+  breakRecords       BreakRecord[]
+  punishments        Punishment[]
+  staffProfile       Staff?
+  chargebacks        Chargeback[]
+  massPPVs           MassPPV[]
+  massMessageRequests MassMessageRequest[] @relation("MassMessageRequester")
+  massMessageReviews  MassMessageRequest[] @relation("MassMessageReviewer")
+  tickets            Ticket[]
+  payoutEntries      PayoutEntry[]
+  invitesCreated     InviteToken[]
+}
+
+// ─── Discord Guilds ───────────────────────────────────────
+model Guild {
+  id        Int      @id @default(autoincrement())
+  guildId   String   @unique
+  name      String
+  joinedAt  DateTime @default(now())
+
+  models    OnlyFansModel[]
+  clockRecords ClockRecord[]
+  massMessageRequests MassMessageRequest[]
+  tickets   Ticket[]
+}
+
+// ─── OF Models ────────────────────────────────────────────
+model OnlyFansModel {
+  id              Int      @id @default(autoincrement())
+  name            String
+  guildId         Int
+  discordCategoryId String?
+  status          String   @default("ACTIVE") // ACTIVE, PAUSED, ARCHIVED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  guild           Guild    @relation(fields: [guildId], references: [id])
+  clockRecords    ClockRecord[]
+  invoices        Invoice[]
+  massPPVs        MassPPV[]
+  chargebacks     Chargeback[]
+  massMessageRequests MassMessageRequest[]
+  tickets         Ticket[]
+
+  @@unique([name, guildId])
+}
+
+// ─── Clock Records ────────────────────────────────────────
+model ClockRecord {
+  id              Int       @id @default(autoincrement())
+  userId          Int
+  modelId         Int
+  guildId         Int
+  discordUserId   String
+  clockIn         DateTime  @default(now())
+  clockOut        DateTime?
+  shiftType       String?   // MORNING, AFTERNOON, NIGHT
+  status          String    @default("ACTIVE") // ACTIVE, COMPLETED
+  createdAt       DateTime  @default(now())
+
+  user            User          @relation(fields: [userId], references: [id])
+  model           OnlyFansModel @relation(fields: [modelId], references: [id])
+  guild           Guild         @relation(fields: [guildId], references: [id])
+  invoice         Invoice?
+  breakRecords    BreakRecord[]
+}
+
+// ─── Invoices ─────────────────────────────────────────────
+model Invoice {
+  id              Int       @id @default(autoincrement())
+  clockRecordId   Int       @unique
+  userId          Int
+  modelId         Int
+  totalGross      Float
+  splitCount      Int       @default(1)
+  splitAmount     Float
+  shiftSummary    String?
+  salesTrackerPath String?
+  payoutPeriodId  Int?
+  createdAt       DateTime  @default(now())
+
+  clockRecord     ClockRecord   @relation(fields: [clockRecordId], references: [id])
+  user            User          @relation(fields: [userId], references: [id])
+  model           OnlyFansModel @relation(fields: [modelId], references: [id])
+  payoutPeriod    PayoutPeriod? @relation(fields: [payoutPeriodId], references: [id])
+  chargebackAssignments ChargebackAssignment[]
+}
+
+// ─── Break Records ────────────────────────────────────────
+model BreakRecord {
+  id              Int       @id @default(autoincrement())
+  clockRecordId   Int
+  userId          Int
+  discordUserId   String
+  startTime       DateTime  @default(now())
+  endTime         DateTime?
+  exceeded        Boolean   @default(false)
+
+  clockRecord     ClockRecord @relation(fields: [clockRecordId], references: [id])
+  user            User        @relation(fields: [userId], references: [id])
+}
+
+// ─── Payout Periods (bi-weekly) ───────────────────────────
+model PayoutPeriod {
+  id          Int       @id @default(autoincrement())
+  startDate   DateTime  // Monday 18:00 CET
+  endDate     DateTime  // Monday 18:00 CET (2 weeks later)
+  bufferEnd   DateTime  // Monday 19:00 CET (1h buffer)
+  status      String    @default("ACTIVE") // ACTIVE, CLOSED
+  createdAt   DateTime  @default(now())
+
+  invoices    Invoice[]
+  entries     PayoutEntry[]
+  chargebacks Chargeback[]
+  punishments Punishment[]
+  massPPVs    MassPPV[]
+}
+
+// ─── Payout Entries ───────────────────────────────────────
+model PayoutEntry {
+  id                    Int      @id @default(autoincrement())
+  payoutPeriodId        Int
+  userId                Int
+  totalGross            Float    @default(0)
+  commissionRate        Float    @default(4.0) // gross %
+  commissionEarnings    Float    @default(0)
+  chargebackDeductions  Float    @default(0)
+  punishmentDeductions  Float    @default(0)
+  massPPVEarnings       Float    @default(0)
+  bonus                 Float    @default(0)
+  feePercent            Float    @default(5.0)
+  feeAmount             Float    @default(0)
+  staffSalary           Float    @default(0)
+  netPayout             Float    @default(0)
+  paid                  Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  payoutPeriod          PayoutPeriod @relation(fields: [payoutPeriodId], references: [id])
+  user                  User         @relation(fields: [userId], references: [id])
+
+  @@unique([payoutPeriodId, userId])
+}
+
+// ─── Punishments ──────────────────────────────────────────
+model Punishment {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  amount          Float
+  reason          String
+  revoked         Boolean  @default(false)
+  payoutPeriodId  Int?
+  createdAt       DateTime @default(now())
+
+  user            User          @relation(fields: [userId], references: [id])
+  payoutPeriod    PayoutPeriod? @relation(fields: [payoutPeriodId], references: [id])
+}
+
+// ─── Staff ────────────────────────────────────────────────
+model Staff {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @unique
+  position        String
+  description     String?
+  monthlySalary   Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User @relation(fields: [userId], references: [id])
+}
+
+// ─── Chargebacks ──────────────────────────────────────────
+model Chargeback {
+  id              Int       @id @default(autoincrement())
+  subscriberName  String
+  userId          Int
+  modelId         Int?
+  ppvSentDate     DateTime?
+  chargebackDate  DateTime?
+  amount          Float
+  payoutPeriodId  Int?
+  createdAt       DateTime  @default(now())
+
+  user            User          @relation(fields: [userId], references: [id])
+  model           OnlyFansModel? @relation(fields: [modelId], references: [id])
+  payoutPeriod    PayoutPeriod? @relation(fields: [payoutPeriodId], references: [id])
+  assignments     ChargebackAssignment[]
+}
+
+model ChargebackAssignment {
+  id            Int      @id @default(autoincrement())
+  chargebackId  Int
+  invoiceId     Int?
+  userId        Int
+  amount        Float
+  createdAt     DateTime @default(now())
+
+  chargeback    Chargeback @relation(fields: [chargebackId], references: [id])
+  invoice       Invoice?   @relation(fields: [invoiceId], references: [id])
+}
+
+// ─── Mass PPVs ────────────────────────────────────────────
+model MassPPV {
+  id              Int      @id @default(autoincrement())
+  sentById        Int
+  modelId         Int
+  price           Float
+  buyerCount      Int
+  description     String?
+  totalSales      Float    // price * buyerCount
+  commissionNet   Float    @default(6.0)   // 6% net
+  commissionGross Float    @default(4.8)   // 4.8% gross
+  commissionAmount Float   @default(0)     // calculated
+  payoutPeriodId  Int?
+  createdAt       DateTime @default(now())
+
+  sentBy          User          @relation(fields: [sentById], references: [id])
+  model           OnlyFansModel @relation(fields: [modelId], references: [id])
+  payoutPeriod    PayoutPeriod? @relation(fields: [payoutPeriodId], references: [id])
+}
+
+// ─── Mass Message Requests ────────────────────────────────
+model MassMessageRequest {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  modelId         Int
+  guildId         Int
+  message         String
+  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  reviewedById    Int?
+  reviewNote      String?
+  discordMessageId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User          @relation("MassMessageRequester", fields: [userId], references: [id])
+  reviewer        User?         @relation("MassMessageReviewer", fields: [reviewedById], references: [id])
+  model           OnlyFansModel @relation(fields: [modelId], references: [id])
+  guild           Guild         @relation(fields: [guildId], references: [id])
+}
+
+// ─── Tickets ──────────────────────────────────────────────
+model Ticket {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  modelId         Int
+  guildId         Int
+  purpose         String   // COVERAGE, MUTE, CUSTOM, OUTAGE, EMERGENCY, SPENDER
+  title           String
+  description     String
+  data            String?  // JSON for extra fields
+  status          String   @default("OPEN") // OPEN, APPROVED, REJECTED, CLOSED
+  discordMessageId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User          @relation(fields: [userId], references: [id])
+  model           OnlyFansModel @relation(fields: [modelId], references: [id])
+  guild           Guild         @relation(fields: [guildId], references: [id])
+}
+
+// ─── Invite Tokens ────────────────────────────────────────
+model InviteToken {
+  id          Int       @id @default(autoincrement())
+  token       String    @unique
+  createdById Int
+  usedBy      String?   // email of who used it
+  usedAt      DateTime?
+  expiresAt   DateTime?
+  paused      Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  createdBy   User @relation(fields: [createdById], references: [id])
+}
