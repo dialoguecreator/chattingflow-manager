@@ -13,7 +13,9 @@ export default function StaffPage() {
     const [loading, setLoading] = useState(true);
     const [showAdd, setShowAdd] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+    const [editingStaff, setEditingStaff] = useState<any | null>(null);
     const [form, setForm] = useState({ firstName: '', lastName: '', email: '', positions: [] as string[], monthlySalary: '' });
+    const [editForm, setEditForm] = useState({ firstName: '', lastName: '', positions: [] as string[], monthlySalary: '' });
 
     useEffect(() => { if (status === 'unauthenticated') router.push('/login'); }, [status, router]);
     useEffect(() => { loadStaff(); }, []);
@@ -31,6 +33,15 @@ export default function StaffPage() {
         }));
     };
 
+    const toggleEditPosition = (pos: string) => {
+        setEditForm(prev => ({
+            ...prev,
+            positions: prev.positions.includes(pos)
+                ? prev.positions.filter(p => p !== pos)
+                : [...prev.positions, pos],
+        }));
+    };
+
     const addStaff = async () => {
         await fetch('/api/staff', {
             method: 'POST',
@@ -39,6 +50,32 @@ export default function StaffPage() {
         });
         setShowAdd(false);
         setForm({ firstName: '', lastName: '', email: '', positions: [], monthlySalary: '' });
+        loadStaff();
+    };
+
+    const openEdit = (staff: any) => {
+        setEditingStaff(staff);
+        setEditForm({
+            firstName: staff.user?.firstName || '',
+            lastName: staff.user?.lastName || '',
+            positions: staff.position ? staff.position.split(', ').filter((p: string) => p) : [],
+            monthlySalary: staff.monthlySalary?.toString() || '0',
+        });
+    };
+
+    const saveEdit = async () => {
+        if (!editingStaff) return;
+        await fetch(`/api/staff/${editingStaff.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                firstName: editForm.firstName,
+                lastName: editForm.lastName,
+                position: editForm.positions.join(', '),
+                monthlySalary: editForm.monthlySalary,
+            }),
+        });
+        setEditingStaff(null);
         loadStaff();
     };
 
@@ -68,15 +105,19 @@ export default function StaffPage() {
                                             <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{s.user?.firstName} {s.user?.lastName}</td>
                                             <td>
                                                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                                    {s.position?.split(', ').map((pos: string) => (
+                                                    {s.position?.split(', ').filter((p: string) => p).map((pos: string) => (
                                                         <span key={pos} className="badge badge-primary">{pos}</span>
                                                     ))}
+                                                    {(!s.position || s.position.trim() === '') && <span className="text-muted">—</span>}
                                                 </div>
                                             </td>
                                             <td style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>${s.monthlySalary?.toFixed(2)}</td>
                                             <td>${(s.monthlySalary / 2)?.toFixed(2)}</td>
                                             <td>
-                                                <button className="btn btn-sm btn-danger" onClick={() => setConfirmDelete(s.id)}>🗑️ Remove</button>
+                                                <div style={{ display: 'flex', gap: 6 }}>
+                                                    <button className="btn btn-sm btn-secondary" onClick={() => openEdit(s)}>✏️ Edit</button>
+                                                    <button className="btn btn-sm btn-danger" onClick={() => setConfirmDelete(s.id)}>🗑️ Remove</button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -91,6 +132,7 @@ export default function StaffPage() {
                     )}
                 </div>
 
+                {/* Add Staff Modal */}
                 {showAdd && (
                     <div className="modal-overlay" onClick={() => setShowAdd(false)}>
                         <div className="modal" onClick={e => e.stopPropagation()}>
@@ -143,6 +185,58 @@ export default function StaffPage() {
                         </div>
                     </div>
                 )}
+
+                {/* Edit Staff Modal */}
+                {editingStaff && (
+                    <div className="modal-overlay" onClick={() => setEditingStaff(null)}>
+                        <div className="modal" onClick={e => e.stopPropagation()}>
+                            <h3 className="modal-title">Edit Staff Member</h3>
+                            <div className="form-group">
+                                <label className="form-label">First Name</label>
+                                <input className="form-input" value={editForm.firstName} onChange={e => setEditForm({ ...editForm, firstName: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Last Name</label>
+                                <input className="form-input" value={editForm.lastName} onChange={e => setEditForm({ ...editForm, lastName: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Positions</label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                                    {POSITIONS.map(pos => (
+                                        <button
+                                            key={pos}
+                                            type="button"
+                                            onClick={() => toggleEditPosition(pos)}
+                                            style={{
+                                                padding: '6px 14px',
+                                                borderRadius: 'var(--radius-md)',
+                                                border: editForm.positions.includes(pos) ? '2px solid var(--accent-primary)' : '1px solid var(--border-primary)',
+                                                background: editForm.positions.includes(pos) ? 'rgba(139, 92, 246, 0.2)' : 'var(--bg-glass)',
+                                                color: editForm.positions.includes(pos) ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                                                cursor: 'pointer',
+                                                fontSize: 13,
+                                                fontWeight: editForm.positions.includes(pos) ? 600 : 400,
+                                                transition: 'all 150ms ease',
+                                            }}
+                                        >
+                                            {editForm.positions.includes(pos) ? '✓ ' : ''}{pos}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Monthly Salary ($)</label>
+                                <input className="form-input" type="number" value={editForm.monthlySalary} onChange={e => setEditForm({ ...editForm, monthlySalary: e.target.value })} />
+                            </div>
+                            <div className="modal-actions">
+                                <button className="btn btn-secondary" onClick={() => setEditingStaff(null)}>Cancel</button>
+                                <button className="btn btn-primary" onClick={saveEdit}>💾 Save Changes</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Delete Confirm Modal */}
                 {confirmDelete !== null && (
                     <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
                         <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
