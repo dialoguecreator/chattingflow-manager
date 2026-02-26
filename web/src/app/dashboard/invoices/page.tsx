@@ -138,15 +138,23 @@ export default function InvoicesPage() {
     const addInvoice = async () => {
         setSaving(true);
         try {
-            await fetch('/api/invoices', {
+            const res = await fetch('/api/invoices', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(addForm),
             });
+            const data = await res.json();
+            if (!res.ok) {
+                alert(`Error: ${data.error || 'Failed to create shift'}`);
+                setSaving(false);
+                return;
+            }
             setShowAdd(false);
             setAddForm({ userId: '', modelId: '', clockIn: '', clockOut: '', totalGross: '', splitCount: '1', shiftSummary: '' });
             fetchInvoices(page);
-        } catch (e) { console.error(e); }
+        } catch (e: any) {
+            alert(`Error: ${e.message || 'Network error'}`);
+        }
         setSaving(false);
     };
 
