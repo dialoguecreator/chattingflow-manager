@@ -14,17 +14,20 @@ export async function GET() {
     } catch { return NextResponse.json({ error: 'Failed' }, { status: 500 }); }
 }
 
-export async function POST() {
+export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+        const body = await req.json().catch(() => ({}));
+        const role = body.role === 'STAFF' ? 'STAFF' : 'CHATTER';
         const userId = (session.user as any).id;
         const token = uuid();
 
         await prisma.inviteToken.create({
             data: {
                 token,
+                role,
                 createdById: userId,
                 expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
             },

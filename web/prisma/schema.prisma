@@ -290,6 +290,7 @@ model Ticket {
 model InviteToken {
   id          Int       @id @default(autoincrement())
   token       String    @unique
+  role        String    @default("CHATTER") // CHATTER or STAFF
   createdById Int
   usedBy      String?   // email of who used it
   usedAt      DateTime?

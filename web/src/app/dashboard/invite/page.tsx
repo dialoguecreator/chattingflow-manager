@@ -11,6 +11,7 @@ export default function InvitePage() {
     const [loading, setLoading] = useState(true);
     const [generatedLink, setGeneratedLink] = useState('');
     const [copied, setCopied] = useState(false);
+    const [inviteRole, setInviteRole] = useState('CHATTER');
 
     useEffect(() => { if (status === 'unauthenticated') router.push('/login'); }, [status, router]);
     useEffect(() => { loadInvites(); }, []);
@@ -20,7 +21,11 @@ export default function InvitePage() {
     };
 
     const generateInvite = async () => {
-        const res = await fetch('/api/invite', { method: 'POST' });
+        const res = await fetch('/api/invite', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: inviteRole }),
+        });
         const data = await res.json();
         const link = `${window.location.origin}/register?token=${data.token}`;
         setGeneratedLink(link);
@@ -65,6 +70,17 @@ export default function InvitePage() {
                     <p className="text-sm text-muted" style={{ marginBottom: 20 }}>
                         Generate a one-time invite link. The recipient can use it to create an account and access the CRM.
                     </p>
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
+                        <span className="text-sm" style={{ fontWeight: 600 }}>Role:</span>
+                        <button
+                            className={`btn btn-sm ${inviteRole === 'CHATTER' ? 'btn-primary' : 'btn-secondary'}`}
+                            onClick={() => setInviteRole('CHATTER')}
+                        >💬 Chatter</button>
+                        <button
+                            className={`btn btn-sm ${inviteRole === 'STAFF' ? 'btn-primary' : 'btn-secondary'}`}
+                            onClick={() => setInviteRole('STAFF')}
+                        >👔 Staff</button>
+                    </div>
                     <button className="btn btn-primary" onClick={generateInvite}>🔗 Generate New Invite Link</button>
 
                     {generatedLink && (
@@ -88,7 +104,7 @@ export default function InvitePage() {
                         <div className="table-container">
                             <table>
                                 <thead>
-                                    <tr><th>Token</th><th>Created</th><th>Status</th><th>Used By</th><th>Actions</th></tr>
+                                    <tr><th>Token</th><th>Role</th><th>Created</th><th>Status</th><th>Used By</th><th>Actions</th></tr>
                                 </thead>
                                 <tbody>
                                     {invites.map((inv: any) => {
@@ -96,6 +112,7 @@ export default function InvitePage() {
                                         return (
                                             <tr key={inv.id}>
                                                 <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{inv.token.slice(0, 16)}...</td>
+                                                <td><span className={`badge ${inv.role === 'STAFF' ? 'badge-primary' : 'badge-warning'}`}>{inv.role || 'CHATTER'}</span></td>
                                                 <td>{new Date(inv.createdAt).toLocaleDateString()}</td>
                                                 <td><span className={`badge ${st.badge}`}>{st.label}</span></td>
                                                 <td>{inv.usedBy || '—'}</td>

@@ -33,10 +33,18 @@ export async function POST(req: Request) {
         if (existingUsername) return NextResponse.json({ error: 'Username already taken' }, { status: 400 });
 
         const hashedPassword = await hash(password, 12);
+        const assignedRole = invite.role === 'STAFF' ? 'STAFF' : 'CHATTER';
 
         const user = await prisma.user.create({
-            data: { email, username, password: hashedPassword, firstName, lastName, role: 'CHATTER' },
+            data: { email, username, password: hashedPassword, firstName, lastName, role: assignedRole },
         });
+
+        // If staff role, auto-create staff profile
+        if (assignedRole === 'STAFF') {
+            await prisma.staff.create({
+                data: { userId: user.id, position: '' },
+            });
+        }
 
         // Mark invite as used
         await prisma.inviteToken.update({
