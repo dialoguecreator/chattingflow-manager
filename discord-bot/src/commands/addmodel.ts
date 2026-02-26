@@ -104,7 +104,7 @@ export default {
             if (supervisorRole) modelInfoPermissions.push({ id: supervisorRole.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] });
 
             await guild.channels.create({
-                name: 'model-info',
+                name: `${modelName.toLowerCase()}-info`,
                 type: ChannelType.GuildText,
                 parent: category.id,
                 permissionOverwrites: modelInfoPermissions,
@@ -126,7 +126,15 @@ export default {
             if (supervisorRole) modelUpdatePermissions.push({ id: supervisorRole.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] });
 
             await guild.channels.create({
-                name: 'model-update',
+                name: `${modelName.toLowerCase()}-update`,
+                type: ChannelType.GuildText,
+                parent: category.id,
+                permissionOverwrites: modelUpdatePermissions,
+            });
+
+            // ─── 5b. schedule (everyone with model role can see + write) ──
+            await guild.channels.create({
+                name: `${modelName.toLowerCase()}-schedule`,
                 type: ChannelType.GuildText,
                 parent: category.id,
                 permissionOverwrites: modelUpdatePermissions,
@@ -188,8 +196,9 @@ export default {
                     { name: '🎭 Role', value: `<@&${modelRole.id}>`, inline: true },
                     {
                         name: '📝 Channels', value: [
-                            '`model-info` — view only for chatters',
-                            '`model-update` — chatters can write',
+                            `\`${modelName.toLowerCase()}-info\` — view only for chatters`,
+                            `\`${modelName.toLowerCase()}-update\` — chatters can write`,
+                            `\`${modelName.toLowerCase()}-schedule\` — chatters can write`,
                             '`sales-file` — management only',
                             '`chat`, `clock-in-and-out`, `milk`, `break`, `mass-message`',
                         ].join('\n')
