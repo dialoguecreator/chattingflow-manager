@@ -16,6 +16,7 @@ model User {
   firstName       String
   lastName        String
   role            String   @default("CHATTER") // FOUNDER, ADMIN, MANAGER, FINANCE_MANAGER, SUPERVISOR, CHATTER, MASS_PPV_ENGINEER
+  status          String   @default("ACTIVE") // ACTIVE, FIRED
   commissionNet   Float    @default(5.0)  // 5% net
   commissionGross Float    @default(4.0)  // 4% gross (net * 0.8)
   discordId       String?  @unique

@@ -13,6 +13,9 @@ export default function MassPPVsPage() {
     const [loading, setLoading] = useState(true);
     const [showAdd, setShowAdd] = useState(false);
     const [form, setForm] = useState({ sentById: '', modelId: '', price: '', buyerCount: '', description: '' });
+    const [editingPPV, setEditingPPV] = useState<any | null>(null);
+    const [editForm, setEditForm] = useState({ price: '', buyerCount: '', description: '' });
+    const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
 
     useEffect(() => { if (status === 'unauthenticated') router.push('/login'); }, [status, router]);
     useEffect(() => { loadData(); }, []);
@@ -41,6 +44,32 @@ export default function MassPPVsPage() {
         loadData();
     };
 
+    const openEdit = (p: any) => {
+        setEditingPPV(p);
+        setEditForm({
+            price: p.price?.toString() || '',
+            buyerCount: p.buyerCount?.toString() || '',
+            description: p.description || '',
+        });
+    };
+
+    const saveEdit = async () => {
+        if (!editingPPV) return;
+        await fetch(`/api/mass-ppvs/${editingPPV.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(editForm),
+        });
+        setEditingPPV(null);
+        loadData();
+    };
+
+    const deletePPV = async (id: number) => {
+        await fetch(`/api/mass-ppvs/${id}`, { method: 'DELETE' });
+        setConfirmDelete(null);
+        loadData();
+    };
+
     return (
         <>
             <header className="main-header">
@@ -58,7 +87,17 @@ export default function MassPPVsPage() {
                         <div className="table-container">
                             <table>
                                 <thead>
-                                    <tr><th>Sent By</th><th>Model</th><th>Price</th><th>Buyers</th><th>Total Sales</th><th>Commission</th><th>Description</th><th>Date</th></tr>
+                                    <tr>
+                                        <th>Sent By</th>
+                                        <th>Model</th>
+                                        <th>Price</th>
+                                        <th>Buyers</th>
+                                        <th>Total Sales</th>
+                                        <th>Commission</th>
+                                        <th>Description</th>
+                                        <th>Date</th>
+                                        <th>Actions</th>
+                                    </tr>
                                 </thead>
                                 <tbody>
                                     {ppvs.map((p: any) => (
@@ -71,6 +110,12 @@ export default function MassPPVsPage() {
                                             <td style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>${p.commissionAmount?.toFixed(2)}</td>
                                             <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.description || '—'}</td>
                                             <td>{new Date(p.createdAt).toLocaleDateString()}</td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: 6 }}>
+                                                    <button className="btn btn-sm btn-secondary" onClick={() => openEdit(p)}>✏️</button>
+                                                    <button className="btn btn-sm btn-danger" onClick={() => setConfirmDelete(p.id)}>🗑️</button>
+                                                </div>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -84,6 +129,7 @@ export default function MassPPVsPage() {
                     )}
                 </div>
 
+                {/* Add Mass PPV Modal */}
                 {showAdd && (
                     <div className="modal-overlay" onClick={() => setShowAdd(false)}>
                         <div className="modal" onClick={e => e.stopPropagation()}>
@@ -117,6 +163,59 @@ export default function MassPPVsPage() {
                             <div className="modal-actions">
                                 <button className="btn btn-secondary" onClick={() => setShowAdd(false)}>Cancel</button>
                                 <button className="btn btn-primary" onClick={addMassPPV}>Add Mass PPV</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Edit Mass PPV Modal */}
+                {editingPPV && (
+                    <div className="modal-overlay" onClick={() => setEditingPPV(null)}>
+                        <div className="modal" onClick={e => e.stopPropagation()}>
+                            <h3 className="modal-title">Edit Mass PPV</h3>
+                            <div className="form-group">
+                                <label className="form-label">PPV Price ($)</label>
+                                <input className="form-input" type="number" step="0.01" value={editForm.price} onChange={e => setEditForm({ ...editForm, price: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Number of Buyers</label>
+                                <input className="form-input" type="number" value={editForm.buyerCount} onChange={e => setEditForm({ ...editForm, buyerCount: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Description</label>
+                                <textarea className="form-textarea" value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} placeholder="PPV content description..." />
+                            </div>
+                            {parseFloat(editForm.price) > 0 && parseInt(editForm.buyerCount) > 0 && (
+                                <div style={{
+                                    background: 'rgba(139, 92, 246, 0.08)', borderRadius: 'var(--radius-md)',
+                                    padding: '12px 16px', marginBottom: 16, border: '1px solid rgba(139, 92, 246, 0.2)',
+                                }}>
+                                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Preview</div>
+                                    <div style={{ fontSize: 14, color: 'var(--text-primary)' }}>
+                                        Total Sales: <strong style={{ color: 'var(--success)' }}>${(parseFloat(editForm.price) * parseInt(editForm.buyerCount)).toFixed(2)}</strong>
+                                        {' · '}Commission: <strong style={{ color: 'var(--accent-primary)' }}>${(parseFloat(editForm.price) * parseInt(editForm.buyerCount) * 0.048).toFixed(2)}</strong>
+                                    </div>
+                                </div>
+                            )}
+                            <div className="modal-actions">
+                                <button className="btn btn-secondary" onClick={() => setEditingPPV(null)}>Cancel</button>
+                                <button className="btn btn-primary" onClick={saveEdit}>💾 Save Changes</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Delete Confirm Modal */}
+                {confirmDelete !== null && (
+                    <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
+                        <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+                            <h3 className="modal-title">Delete Mass PPV</h3>
+                            <p style={{ color: 'var(--text-secondary)', margin: '12px 0 24px' }}>
+                                Are you sure you want to delete this mass PPV record? This action cannot be undone.
+                            </p>
+                            <div className="modal-actions">
+                                <button className="btn btn-secondary" onClick={() => setConfirmDelete(null)}>Cancel</button>
+                                <button className="btn btn-danger" onClick={() => deletePPV(confirmDelete)}>🗑️ Delete</button>
                             </div>
                         </div>
                     </div>

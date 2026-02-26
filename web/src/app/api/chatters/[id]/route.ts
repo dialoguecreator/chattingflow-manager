@@ -7,12 +7,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const body = await req.json();
 
     try {
+        const updateData: any = {};
+        if (body.commissionNet !== undefined) updateData.commissionNet = body.commissionNet;
+        if (body.commissionGross !== undefined) updateData.commissionGross = body.commissionGross;
+        if (body.status !== undefined) updateData.status = body.status;
+
         const user = await prisma.user.update({
             where: { id: userId },
-            data: {
-                commissionNet: body.commissionNet,
-                commissionGross: body.commissionGross,
-            },
+            data: updateData,
         });
         return NextResponse.json({ user });
     } catch (error) {
@@ -20,23 +22,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
 }
 
+// Archive chatter (mark as FIRED) instead of deleting
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const userId = parseInt(id);
 
     try {
-        // Delete related records first
-        await prisma.payoutEntry.deleteMany({ where: { userId } });
-        await prisma.breakRecord.deleteMany({ where: { userId } });
-        await prisma.invoice.deleteMany({ where: { userId } });
-        await prisma.clockRecord.deleteMany({ where: { userId } });
-        await prisma.punishment.deleteMany({ where: { userId } });
-        await prisma.staff.deleteMany({ where: { userId } });
-        await prisma.user.delete({ where: { id: userId } });
-
+        await prisma.user.update({
+            where: { id: userId },
+            data: { status: 'FIRED' },
+        });
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('Delete chatter error:', error);
-        return NextResponse.json({ error: 'Failed to delete' }, { status: 500 });
+        console.error('Archive chatter error:', error);
+        return NextResponse.json({ error: 'Failed to archive' }, { status: 500 });
     }
 }
