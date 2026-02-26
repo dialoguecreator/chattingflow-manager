@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
-const POSITIONS = ['Manager', 'Supervisor', 'Mass PPV Engineer', 'Finance Manager', 'Recruiter', 'Trainer'];
+const POSITIONS = ['Admin', 'Manager', 'Supervisor', 'Mass PPV Engineer', 'Finance Manager', 'Recruiter', 'Trainer'];
 const ROLES = [
     { value: 'ADMIN', label: 'Admin', color: '#ef4444' },
     { value: 'MANAGER', label: 'Manager', color: '#8b5cf6' },
