@@ -13,7 +13,7 @@ function fmtDate(ts: number | string) {
 }
 
 export default function PayoutsPage() {
-    const { status } = useSession();
+    const { data: session, status } = useSession();
     const router = useRouter();
     const [periods, setPeriods] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -24,9 +24,14 @@ export default function PayoutsPage() {
     const [showCreatePeriod, setShowCreatePeriod] = useState(false);
     const [periodForm, setPeriodForm] = useState({ startDate: '', endDate: '' });
 
+    const userRole = (session?.user as any)?.role || '';
+    const isAdminOrManager = userRole === 'ADMIN' || userRole === 'MANAGER';
+
     useEffect(() => {
         if (status === 'unauthenticated') router.push('/login');
-    }, [status, router]);
+        if (status === 'authenticated' && !isAdminOrManager) router.push('/dashboard');
+    }, [status, isAdminOrManager, router]);
+
 
     const loadPeriods = () => {
         fetch('/api/payouts')

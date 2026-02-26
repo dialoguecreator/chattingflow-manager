@@ -9,7 +9,7 @@ const navItems = [
     { label: 'Overview', href: '/dashboard', icon: '📊' },
     { section: 'Financial' },
     { label: 'Invoices', href: '/dashboard/invoices', icon: '🧾' },
-    { label: 'Payouts', href: '/dashboard/payouts', icon: '💸' },
+    { label: 'Payouts', href: '/dashboard/payouts', icon: '💸', adminOnly: true },
     { label: 'Chargebacks', href: '/dashboard/chargebacks', icon: '↩️' },
     { label: 'Mass PPVs', href: '/dashboard/mass-ppvs', icon: '📨' },
     { section: 'People' },
@@ -17,12 +17,14 @@ const navItems = [
     { label: 'Staff', href: '/dashboard/staff', icon: '👥' },
     { label: 'Punishments', href: '/dashboard/punishments', icon: '⚖️' },
     { section: 'Settings' },
-    { label: 'Invite Member', href: '/dashboard/invite', icon: '🔗' },
+    { label: 'Invite Member', href: '/dashboard/invite', icon: '🔗', adminOnly: true },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
     const pathname = usePathname();
     const { data: session } = useSession();
+    const userRole = (session?.user as any)?.role || '';
+    const isAdminOrManager = userRole === 'ADMIN' || userRole === 'MANAGER';
 
     return (
         <div className="app-layout">
@@ -37,6 +39,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     {navItems.map((item, i) => {
                         if ('section' in item) {
                             return <div key={i} className="nav-section-label">{item.section}</div>;
+                        }
+                        // Hide admin-only items for non-admin/non-manager users
+                        if (item.adminOnly && !isAdminOrManager) {
+                            return null;
                         }
                         const isActive = pathname === item.href ||
                             (item.href !== '/dashboard' && pathname?.startsWith(item.href!));

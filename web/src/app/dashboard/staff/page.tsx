@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 const POSITIONS = ['Manager', 'Supervisor', 'Mass PPV Engineer', 'Finance Manager', 'Recruiter', 'Trainer'];
 
 export default function StaffPage() {
-    const { status } = useSession();
+    const { data: session, status } = useSession();
     const router = useRouter();
     const [staffList, setStaffList] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -16,6 +16,10 @@ export default function StaffPage() {
     const [editingStaff, setEditingStaff] = useState<any | null>(null);
     const [form, setForm] = useState({ firstName: '', lastName: '', email: '', positions: [] as string[], monthlySalary: '' });
     const [editForm, setEditForm] = useState({ firstName: '', lastName: '', positions: [] as string[], monthlySalary: '' });
+
+    const userRole = (session?.user as any)?.role || '';
+    const userId = (session?.user as any)?.id;
+    const isAdminOrManager = userRole === 'ADMIN' || userRole === 'MANAGER';
 
     useEffect(() => { if (status === 'unauthenticated') router.push('/login'); }, [status, router]);
     useEffect(() => { loadStaff(); }, []);
@@ -85,22 +89,37 @@ export default function StaffPage() {
         loadStaff();
     };
 
+    // Filter staff list: non-admin/non-manager only see themselves
+    const visibleStaff = isAdminOrManager
+        ? staffList
+        : staffList.filter(s => s.userId === userId);
+
     return (
         <>
             <header className="main-header">
                 <h1 className="page-title">Staff</h1>
-                <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>+ Add Staff</button>
+                {isAdminOrManager && (
+                    <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>+ Add Staff</button>
+                )}
             </header>
             <div className="main-body">
                 <div className="card">
-                    {loading ? <p className="text-muted">Loading...</p> : staffList.length > 0 ? (
+                    {loading ? <p className="text-muted">Loading...</p> : visibleStaff.length > 0 ? (
                         <div className="table-container">
                             <table>
                                 <thead>
-                                    <tr><th>Name</th><th>Position</th><th>Monthly Salary</th><th>Bi-Weekly</th><th>Actions</th></tr>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Position</th>
+                                        {isAdminOrManager && <th>Monthly Salary</th>}
+                                        {isAdminOrManager && <th>Bi-Weekly</th>}
+                                        {!isAdminOrManager && <th>My Salary</th>}
+                                        {!isAdminOrManager && <th>My Bi-Weekly</th>}
+                                        {isAdminOrManager && <th>Actions</th>}
+                                    </tr>
                                 </thead>
                                 <tbody>
-                                    {staffList.map((s: any) => (
+                                    {visibleStaff.map((s: any) => (
                                         <tr key={s.id}>
                                             <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{s.user?.firstName} {s.user?.lastName}</td>
                                             <td>
@@ -113,12 +132,14 @@ export default function StaffPage() {
                                             </td>
                                             <td style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>${s.monthlySalary?.toFixed(2)}</td>
                                             <td>${(s.monthlySalary / 2)?.toFixed(2)}</td>
-                                            <td>
-                                                <div style={{ display: 'flex', gap: 6 }}>
-                                                    <button className="btn btn-sm btn-secondary" onClick={() => openEdit(s)}>✏️ Edit</button>
-                                                    <button className="btn btn-sm btn-danger" onClick={() => setConfirmDelete(s.id)}>🗑️ Remove</button>
-                                                </div>
-                                            </td>
+                                            {isAdminOrManager && (
+                                                <td>
+                                                    <div style={{ display: 'flex', gap: 6 }}>
+                                                        <button className="btn btn-sm btn-secondary" onClick={() => openEdit(s)}>✏️ Edit</button>
+                                                        <button className="btn btn-sm btn-danger" onClick={() => setConfirmDelete(s.id)}>🗑️ Remove</button>
+                                                    </div>
+                                                </td>
+                                            )}
                                         </tr>
                                     ))}
                                 </tbody>
@@ -127,13 +148,13 @@ export default function StaffPage() {
                     ) : (
                         <div className="empty-state">
                             <div className="empty-state-icon">👥</div>
-                            <div className="empty-state-text">No staff added yet.</div>
+                            <div className="empty-state-text">{isAdminOrManager ? 'No staff added yet.' : 'You are not assigned as staff.'}</div>
                         </div>
                     )}
                 </div>
 
                 {/* Add Staff Modal */}
-                {showAdd && (
+                {showAdd && isAdminOrManager && (
                     <div className="modal-overlay" onClick={() => setShowAdd(false)}>
                         <div className="modal" onClick={e => e.stopPropagation()}>
                             <h3 className="modal-title">Add Staff Member</h3>
@@ -187,7 +208,7 @@ export default function StaffPage() {
                 )}
 
                 {/* Edit Staff Modal */}
-                {editingStaff && (
+                {editingStaff && isAdminOrManager && (
                     <div className="modal-overlay" onClick={() => setEditingStaff(null)}>
                         <div className="modal" onClick={e => e.stopPropagation()}>
                             <h3 className="modal-title">Edit Staff Member</h3>
