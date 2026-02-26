@@ -46,13 +46,22 @@ export default function ModelsPage() {
 
     const saveCommission = async () => {
         if (!editingModel) return;
-        await fetch(`/api/models/${editingModel.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ commission: editCommission }),
-        });
-        setEditingModel(null);
-        loadData();
+        try {
+            const res = await fetch(`/api/models/${editingModel.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ commission: editCommission }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert(`Error: ${data.error || 'Failed to save commission'}`);
+                return;
+            }
+            setEditingModel(null);
+            loadData();
+        } catch (err) {
+            alert('Network error saving commission');
+        }
     };
 
     if (userRole !== 'ADMIN') return null;
@@ -88,7 +97,8 @@ export default function ModelsPage() {
                                     {models.map((m: any) => {
                                         const rev = revenueData[m.id];
                                         const totalSales = rev?.totalSales || 0;
-                                        const commissionEarnings = totalSales * (m.commission / 100);
+                                        const comm = m.commission || 0;
+                                        const commissionEarnings = totalSales * (comm / 100);
                                         return (
                                             <tr key={m.id}>
                                                 <td>
@@ -111,9 +121,9 @@ export default function ModelsPage() {
                                                     <span style={{
                                                         fontSize: 18,
                                                         fontWeight: 700,
-                                                        color: m.commission > 0 ? 'var(--accent-primary)' : 'var(--text-muted)',
+                                                        color: (m.commission || 0) > 0 ? 'var(--accent-primary)' : 'var(--text-muted)',
                                                     }}>
-                                                        {m.commission > 0 ? `${m.commission}%` : 'Not set'}
+                                                        {(m.commission || 0) > 0 ? `${m.commission}%` : 'Not set'}
                                                     </span>
                                                 </td>
                                                 <td style={{ color: 'var(--success)', fontWeight: 600 }}>
@@ -123,7 +133,7 @@ export default function ModelsPage() {
                                                     fontWeight: 700,
                                                     color: commissionEarnings > 0 ? 'var(--accent-primary)' : 'var(--text-muted)',
                                                 }}>
-                                                    {m.commission > 0 ? `$${fmt(commissionEarnings)}` : '—'}
+                                                    {comm > 0 ? `$${fmt(commissionEarnings)}` : '—'}
                                                 </td>
                                                 <td>
                                                     <button className="btn btn-sm btn-secondary" onClick={() => openEdit(m)}>
@@ -145,7 +155,7 @@ export default function ModelsPage() {
                                         <td style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>
                                             ${fmt(models.reduce((s, m) => {
                                                 const rev = revenueData[m.id];
-                                                return s + ((rev?.totalSales || 0) * (m.commission / 100));
+                                                return s + ((rev?.totalSales || 0) * ((m.commission || 0) / 100));
                                             }, 0))}
                                         </td>
                                         <td></td>
