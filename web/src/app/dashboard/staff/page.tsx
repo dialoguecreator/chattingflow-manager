@@ -5,6 +5,12 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
 const POSITIONS = ['Manager', 'Supervisor', 'Mass PPV Engineer', 'Finance Manager', 'Recruiter', 'Trainer'];
+const ROLES = [
+    { value: 'ADMIN', label: 'Admin', color: '#ef4444' },
+    { value: 'MANAGER', label: 'Manager', color: '#8b5cf6' },
+    { value: 'SUPERVISOR', label: 'Supervisor', color: '#3b82f6' },
+    { value: 'STAFF', label: 'Staff', color: '#6b7280' },
+];
 
 export default function StaffPage() {
     const { data: session, status } = useSession();
@@ -15,10 +21,11 @@ export default function StaffPage() {
     const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
     const [editingStaff, setEditingStaff] = useState<any | null>(null);
     const [form, setForm] = useState({ firstName: '', lastName: '', email: '', positions: [] as string[], monthlySalary: '' });
-    const [editForm, setEditForm] = useState({ firstName: '', lastName: '', positions: [] as string[], monthlySalary: '' });
+    const [editForm, setEditForm] = useState({ firstName: '', lastName: '', positions: [] as string[], monthlySalary: '', userRole: '' });
 
     const userRole = (session?.user as any)?.role || '';
     const userId = (session?.user as any)?.id;
+    const isAdmin = userRole === 'ADMIN';
     const isAdminOrManager = userRole === 'ADMIN' || userRole === 'MANAGER';
 
     useEffect(() => { if (status === 'unauthenticated') router.push('/login'); }, [status, router]);
@@ -64,6 +71,7 @@ export default function StaffPage() {
             lastName: staff.user?.lastName || '',
             positions: staff.position ? staff.position.split(', ').filter((p: string) => p) : [],
             monthlySalary: staff.monthlySalary?.toString() || '0',
+            userRole: staff.user?.role || 'STAFF',
         });
     };
 
@@ -77,6 +85,7 @@ export default function StaffPage() {
                 lastName: editForm.lastName,
                 position: editForm.positions.join(', '),
                 monthlySalary: editForm.monthlySalary,
+                userRole: editForm.userRole,
             }),
         });
         setEditingStaff(null);
@@ -89,10 +98,29 @@ export default function StaffPage() {
         loadStaff();
     };
 
-    // Filter staff list: non-admin/non-manager only see themselves
+    // Filter: non-admin/non-manager see only themselves
     const visibleStaff = isAdminOrManager
         ? staffList
         : staffList.filter(s => s.userId === userId);
+
+    const getRoleBadge = (role: string) => {
+        const r = ROLES.find(r => r.value === role);
+        if (!r) return null;
+        return (
+            <span style={{
+                display: 'inline-block',
+                padding: '2px 8px',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: 11,
+                fontWeight: 600,
+                background: `${r.color}22`,
+                color: r.color,
+                border: `1px solid ${r.color}44`,
+            }}>
+                {r.label}
+            </span>
+        );
+    };
 
     return (
         <>
@@ -110,11 +138,10 @@ export default function StaffPage() {
                                 <thead>
                                     <tr>
                                         <th>Name</th>
+                                        <th>Role</th>
                                         <th>Position</th>
-                                        {isAdminOrManager && <th>Monthly Salary</th>}
-                                        {isAdminOrManager && <th>Bi-Weekly</th>}
-                                        {!isAdminOrManager && <th>My Salary</th>}
-                                        {!isAdminOrManager && <th>My Bi-Weekly</th>}
+                                        {isAdminOrManager ? <th>Monthly Salary</th> : <th>My Salary</th>}
+                                        {isAdminOrManager ? <th>Bi-Weekly</th> : <th>My Bi-Weekly</th>}
                                         {isAdminOrManager && <th>Actions</th>}
                                     </tr>
                                 </thead>
@@ -122,6 +149,7 @@ export default function StaffPage() {
                                     {visibleStaff.map((s: any) => (
                                         <tr key={s.id}>
                                             <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{s.user?.firstName} {s.user?.lastName}</td>
+                                            <td>{getRoleBadge(s.user?.role)}</td>
                                             <td>
                                                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                                                     {s.position?.split(', ').filter((p: string) => p).map((pos: string) => (
@@ -220,6 +248,36 @@ export default function StaffPage() {
                                 <label className="form-label">Last Name</label>
                                 <input className="form-input" value={editForm.lastName} onChange={e => setEditForm({ ...editForm, lastName: e.target.value })} />
                             </div>
+
+                            {/* Role assignment - only visible to ADMIN */}
+                            {isAdmin && (
+                                <div className="form-group">
+                                    <label className="form-label">System Role</label>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                                        {ROLES.map(role => (
+                                            <button
+                                                key={role.value}
+                                                type="button"
+                                                onClick={() => setEditForm({ ...editForm, userRole: role.value })}
+                                                style={{
+                                                    padding: '6px 14px',
+                                                    borderRadius: 'var(--radius-md)',
+                                                    border: editForm.userRole === role.value ? `2px solid ${role.color}` : '1px solid var(--border-primary)',
+                                                    background: editForm.userRole === role.value ? `${role.color}22` : 'var(--bg-glass)',
+                                                    color: editForm.userRole === role.value ? role.color : 'var(--text-secondary)',
+                                                    cursor: 'pointer',
+                                                    fontSize: 13,
+                                                    fontWeight: editForm.userRole === role.value ? 600 : 400,
+                                                    transition: 'all 150ms ease',
+                                                }}
+                                            >
+                                                {editForm.userRole === role.value ? '✓ ' : ''}{role.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="form-group">
                                 <label className="form-label">Positions</label>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
