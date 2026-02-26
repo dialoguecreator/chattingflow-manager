@@ -95,6 +95,7 @@ export default function InvoicesPage() {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
+    const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
 
     // Add shift modal
     const [showAdd, setShowAdd] = useState(false);
@@ -184,9 +185,9 @@ export default function InvoicesPage() {
     };
 
     const handleDelete = async (id: number) => {
-        if (!confirm('Are you sure you want to delete this invoice?')) return;
         try {
             await fetch(`/api/invoices/${id}`, { method: 'DELETE' });
+            setConfirmDelete(null);
             fetchInvoices(page);
         } catch (e) { console.error(e); }
     };
@@ -251,7 +252,7 @@ export default function InvoicesPage() {
                                                 <td>
                                                     <div style={{ display: 'flex', gap: '6px' }}>
                                                         <button className="btn btn-sm btn-primary" onClick={() => openEdit(inv)}>✏️</button>
-                                                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(inv.id)}>🗑️</button>
+                                                        <button className="btn btn-sm btn-danger" onClick={() => setConfirmDelete(inv.id)}>🗑️</button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -423,6 +424,22 @@ export default function InvoicesPage() {
                             <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
                                 {saving ? 'Saving...' : 'Save Changes'}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirm Modal */}
+            {confirmDelete !== null && (
+                <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
+                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+                        <h3 className="modal-title">Delete Invoice</h3>
+                        <p style={{ color: 'var(--text-secondary)', margin: '12px 0 24px' }}>
+                            Are you sure you want to delete this invoice? This action cannot be undone.
+                        </p>
+                        <div className="modal-actions">
+                            <button className="btn btn-secondary" onClick={() => setConfirmDelete(null)}>Cancel</button>
+                            <button className="btn btn-danger" onClick={() => handleDelete(confirmDelete)}>🗑️ Delete</button>
                         </div>
                     </div>
                 </div>
