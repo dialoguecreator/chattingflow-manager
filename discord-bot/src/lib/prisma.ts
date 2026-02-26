@@ -7,15 +7,20 @@ const rootDir = path.resolve(__dirname, '../..');
 const projectRoot = path.resolve(rootDir, '..');
 dotenv.config({ path: path.join(projectRoot, '.env') });
 
-// Point to the shared database in web/prisma/dev.db
-const dbPath = path.resolve(projectRoot, 'web', 'prisma', 'dev.db');
+// Also load from discord-bot dir if it exists (for production)
+dotenv.config({ path: path.join(rootDir, '.env') });
+
+const databaseUrl = process.env.DATABASE_URL;
 
 const prisma = new PrismaClient({
-    datasources: {
-        db: {
-            url: `file:${dbPath}`,
+    ...(databaseUrl && !databaseUrl.startsWith('postgresql') && !databaseUrl.startsWith('postgres') ? {
+        datasources: {
+            db: {
+                url: databaseUrl.startsWith('file:') ? databaseUrl : `file:${path.resolve(projectRoot, 'web', 'prisma', 'dev.db')}`,
+            },
         },
-    },
+    } : {}),
 });
 
 export default prisma;
+
