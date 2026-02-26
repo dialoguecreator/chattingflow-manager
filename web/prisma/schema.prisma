@@ -57,6 +57,7 @@ model OnlyFansModel {
   name            String
   guildId         Int
   discordCategoryId String?
+  commission      Float    @default(0) // Net commission percentage (e.g. 22 = 22%)
   status          String   @default("ACTIVE") // ACTIVE, PAUSED, ARCHIVED
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
