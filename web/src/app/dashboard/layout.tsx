@@ -9,6 +9,7 @@ const navItems = [
     { label: 'Overview', href: '/dashboard', icon: '📊' },
     { section: 'Financial' },
     { label: 'Invoices', href: '/dashboard/invoices', icon: '🧾' },
+    { label: 'Revenue', href: '/dashboard/revenue', icon: '💰', adminOnly: true },
     { label: 'Payouts', href: '/dashboard/payouts', icon: '💸', adminOnly: true },
     { label: 'Chargebacks', href: '/dashboard/chargebacks', icon: '↩️' },
     { label: 'Mass PPVs', href: '/dashboard/mass-ppvs', icon: '📨' },
