@@ -92,7 +92,10 @@ export default function ChargebacksPage() {
     const [models, setModels] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAdd, setShowAdd] = useState(false);
+    const [editingCb, setEditingCb] = useState<any | null>(null);
+    const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
     const [form, setForm] = useState({ subscriberName: '', userId: '', modelId: '', amount: '', ppvSentDate: '', chargebackDate: '' });
+    const [editForm, setEditForm] = useState({ subscriberName: '', userId: '', modelId: '', amount: '', ppvSentDate: '', chargebackDate: '' });
 
     useEffect(() => { if (status === 'unauthenticated') router.push('/login'); }, [status, router]);
     useEffect(() => { loadData(); }, []);
@@ -121,6 +124,35 @@ export default function ChargebacksPage() {
         loadData();
     };
 
+    const openEdit = (cb: any) => {
+        setEditingCb(cb);
+        setEditForm({
+            subscriberName: cb.subscriberName || '',
+            userId: String(cb.userId || ''),
+            modelId: String(cb.modelId || ''),
+            amount: cb.amount?.toString() || '',
+            ppvSentDate: cb.ppvSentDate ? new Date(cb.ppvSentDate).toISOString().split('T')[0] : '',
+            chargebackDate: cb.chargebackDate ? new Date(cb.chargebackDate).toISOString().split('T')[0] : '',
+        });
+    };
+
+    const saveEdit = async () => {
+        if (!editingCb) return;
+        await fetch(`/api/chargebacks/${editingCb.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(editForm),
+        });
+        setEditingCb(null);
+        loadData();
+    };
+
+    const deleteChargeback = async (id: number) => {
+        await fetch(`/api/chargebacks/${id}`, { method: 'DELETE' });
+        setConfirmDelete(null);
+        loadData();
+    };
+
     return (
         <>
             <header className="main-header">
@@ -133,7 +165,7 @@ export default function ChargebacksPage() {
                         <div className="table-container">
                             <table>
                                 <thead>
-                                    <tr><th>Subscriber</th><th>Chatter</th><th>Model</th><th>Amount</th><th>PPV Sent</th><th>Chargeback Date</th></tr>
+                                    <tr><th>Subscriber</th><th>Chatter</th><th>Model</th><th>Amount</th><th>PPV Sent</th><th>Chargeback Date</th><th>Actions</th></tr>
                                 </thead>
                                 <tbody>
                                     {chargebacks.map((cb: any) => (
@@ -144,6 +176,12 @@ export default function ChargebacksPage() {
                                             <td style={{ color: 'var(--danger)', fontWeight: 700 }}>-${cb.amount?.toFixed(2)}</td>
                                             <td>{cb.ppvSentDate ? new Date(cb.ppvSentDate).toLocaleDateString() : '—'}</td>
                                             <td>{cb.chargebackDate ? new Date(cb.chargebackDate).toLocaleDateString() : '—'}</td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: 6 }}>
+                                                    <button className="btn btn-sm btn-secondary" onClick={() => openEdit(cb)}>✏️ Edit</button>
+                                                    <button className="btn btn-sm btn-danger" onClick={() => setConfirmDelete(cb.id)}>🗑️</button>
+                                                </div>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -157,6 +195,7 @@ export default function ChargebacksPage() {
                     )}
                 </div>
 
+                {/* Add Modal */}
                 {showAdd && (
                     <div className="modal-overlay" onClick={() => setShowAdd(false)}>
                         <div className="modal" onClick={e => e.stopPropagation()}>
@@ -165,7 +204,6 @@ export default function ChargebacksPage() {
                                 <label className="form-label">Subscriber Name</label>
                                 <input className="form-input" value={form.subscriberName} onChange={e => setForm({ ...form, subscriberName: e.target.value })} />
                             </div>
-
                             <SearchableSelect
                                 label="Chatter"
                                 placeholder="Search chatter..."
@@ -173,7 +211,6 @@ export default function ChargebacksPage() {
                                 value={form.userId}
                                 onChange={val => setForm({ ...form, userId: val })}
                             />
-
                             <SearchableSelect
                                 label="Model"
                                 placeholder="Search model..."
@@ -181,7 +218,6 @@ export default function ChargebacksPage() {
                                 value={form.modelId}
                                 onChange={val => setForm({ ...form, modelId: val })}
                             />
-
                             <div className="form-group">
                                 <label className="form-label">Amount ($)</label>
                                 <input className="form-input" type="number" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
@@ -197,6 +233,65 @@ export default function ChargebacksPage() {
                             <div className="modal-actions">
                                 <button className="btn btn-secondary" onClick={() => setShowAdd(false)}>Cancel</button>
                                 <button className="btn btn-danger" onClick={addChargeback}>Add Chargeback</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Edit Modal */}
+                {editingCb && (
+                    <div className="modal-overlay" onClick={() => setEditingCb(null)}>
+                        <div className="modal" onClick={e => e.stopPropagation()}>
+                            <h3 className="modal-title">Edit Chargeback</h3>
+                            <div className="form-group">
+                                <label className="form-label">Subscriber Name</label>
+                                <input className="form-input" value={editForm.subscriberName} onChange={e => setEditForm({ ...editForm, subscriberName: e.target.value })} />
+                            </div>
+                            <SearchableSelect
+                                label="Chatter"
+                                placeholder="Search chatter..."
+                                items={chatters.map((c: any) => ({ id: c.id, label: `${c.firstName} ${c.lastName}` }))}
+                                value={editForm.userId}
+                                onChange={val => setEditForm({ ...editForm, userId: val })}
+                            />
+                            <SearchableSelect
+                                label="Model"
+                                placeholder="Search model..."
+                                items={models.map((m: any) => ({ id: m.id, label: m.name }))}
+                                value={editForm.modelId}
+                                onChange={val => setEditForm({ ...editForm, modelId: val })}
+                            />
+                            <div className="form-group">
+                                <label className="form-label">Amount ($)</label>
+                                <input className="form-input" type="number" step="0.01" value={editForm.amount} onChange={e => setEditForm({ ...editForm, amount: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">PPV Sent Date</label>
+                                <input className="form-input" type="date" value={editForm.ppvSentDate} onChange={e => setEditForm({ ...editForm, ppvSentDate: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Chargeback Date</label>
+                                <input className="form-input" type="date" value={editForm.chargebackDate} onChange={e => setEditForm({ ...editForm, chargebackDate: e.target.value })} />
+                            </div>
+                            <div className="modal-actions">
+                                <button className="btn btn-secondary" onClick={() => setEditingCb(null)}>Cancel</button>
+                                <button className="btn btn-primary" onClick={saveEdit}>💾 Save Changes</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Delete Confirm Modal */}
+                {confirmDelete !== null && (
+                    <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
+                        <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+                            <h3 className="modal-title">Delete Chargeback</h3>
+                            <p style={{ color: 'var(--text-secondary)', margin: '12px 0 24px' }}>
+                                Are you sure you want to delete this chargeback? This action cannot be undone.
+                            </p>
+                            <div className="modal-actions">
+                                <button className="btn btn-secondary" onClick={() => setConfirmDelete(null)}>Cancel</button>
+                                <button className="btn btn-danger" onClick={() => deleteChargeback(confirmDelete)}>🗑️ Delete</button>
                             </div>
                         </div>
                     </div>
