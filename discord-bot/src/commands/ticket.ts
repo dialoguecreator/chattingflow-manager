@@ -11,8 +11,9 @@ export default {
     async execute(interaction: ChatInputCommandInteraction) {
         const channel = interaction.channel!;
 
-        if (!('name' in channel) || channel.name !== 'model-update') {
-            const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ This command can only be used in a `#model-update` channel.');
+        const channelName = ('name' in channel ? channel.name : '') || '';
+        if (!channelName.endsWith('-update') && channelName !== 'milk') {
+            const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ This command can only be used in a model update channel (e.g. `#lara-update`) or `#milk`.');
             return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
         }
 

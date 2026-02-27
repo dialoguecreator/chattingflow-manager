@@ -147,12 +147,12 @@ export default {
                 },
             });
 
-            // Find the #model-update channel
+            // Find the update channel (e.g. lara-update, mia-update)
             const category = guild.channels.cache.get(categoryId);
             let targetChannel: TextChannel | undefined;
             if (category && category.type === ChannelType.GuildCategory) {
                 targetChannel = category.children.cache.find(
-                    ch => ch.name === 'model-update' && ch.type === ChannelType.GuildText
+                    ch => ch.name.endsWith('-update') && ch.type === ChannelType.GuildText
                 ) as TextChannel | undefined;
             }
 
