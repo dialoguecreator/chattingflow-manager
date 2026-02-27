@@ -4,12 +4,13 @@ import { useEffect, useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
-function SearchableSelect({ label, placeholder, items, value, onChange }: {
+function SearchableSelect({ label, placeholder, items, value, onChange, onAddNew }: {
     label: string;
     placeholder: string;
     items: { id: number; label: string }[];
     value: string;
     onChange: (val: string) => void;
+    onAddNew?: () => void;
 }) {
     const [search, setSearch] = useState('');
     const [open, setOpen] = useState(false);
@@ -46,7 +47,7 @@ function SearchableSelect({ label, placeholder, items, value, onChange }: {
                     top: '100%',
                     left: 0,
                     right: 0,
-                    maxHeight: 200,
+                    maxHeight: 240,
                     overflowY: 'auto',
                     background: 'var(--bg-secondary)',
                     border: '1px solid var(--border-primary)',
@@ -78,6 +79,25 @@ function SearchableSelect({ label, placeholder, items, value, onChange }: {
                             No results found
                         </div>
                     )}
+                    {onAddNew && (
+                        <div
+                            onClick={() => { onAddNew(); setOpen(false); setSearch(''); }}
+                            style={{
+                                padding: '10px 14px',
+                                cursor: 'pointer',
+                                fontSize: 14,
+                                fontWeight: 600,
+                                color: 'var(--accent-primary)',
+                                background: 'rgba(139, 92, 246, 0.05)',
+                                borderTop: '2px solid var(--border-primary)',
+                                transition: 'background 100ms',
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(139, 92, 246, 0.05)')}
+                        >
+                            ➕ Add New Chatter
+                        </div>
+                    )}
                 </div>
             )}
         </div>
@@ -104,6 +124,37 @@ export default function InvoicesPage() {
     const [addForm, setAddForm] = useState({
         userId: '', modelId: '', clockIn: '', clockOut: '', totalGross: '', splitCount: '1', shiftSummary: ''
     });
+
+    // Inline add chatter
+    const [showNewChatter, setShowNewChatter] = useState(false);
+    const [newChatterForm, setNewChatterForm] = useState({ discordUsername: '', discordId: '', displayName: '' });
+    const [creatingChatter, setCreatingChatter] = useState(false);
+
+    const createChatter = async () => {
+        if (!newChatterForm.discordUsername || !newChatterForm.displayName) return;
+        setCreatingChatter(true);
+        try {
+            const res = await fetch('/api/chatters', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newChatterForm),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert(`Error: ${data.error || 'Failed to create chatter'}`);
+                setCreatingChatter(false);
+                return;
+            }
+            // Add new chatter to the list and select them
+            setChatters(prev => [...prev, data.chatter]);
+            setAddForm(prev => ({ ...prev, userId: String(data.chatter.id) }));
+            setShowNewChatter(false);
+            setNewChatterForm({ discordUsername: '', discordId: '', displayName: '' });
+        } catch (e: any) {
+            alert(`Error: ${e.message || 'Network error'}`);
+        }
+        setCreatingChatter(false);
+    };
 
     useEffect(() => {
         if (status === 'unauthenticated') router.push('/login');
@@ -323,7 +374,62 @@ export default function InvoicesPage() {
                             items={chatters.map((c: any) => ({ id: c.id, label: `${c.firstName} ${c.lastName} (${c.username})` }))}
                             value={addForm.userId}
                             onChange={val => setAddForm({ ...addForm, userId: val })}
+                            onAddNew={() => setShowNewChatter(true)}
                         />
+
+                        {showNewChatter && (
+                            <div style={{
+                                background: 'rgba(139, 92, 246, 0.08)',
+                                border: '1px solid var(--border-primary)',
+                                borderRadius: 'var(--radius-md)',
+                                padding: '1rem',
+                                marginBottom: '0.5rem',
+                            }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                                    <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>➕ New Chatter</span>
+                                    <button
+                                        className="btn btn-sm btn-secondary"
+                                        onClick={() => { setShowNewChatter(false); setNewChatterForm({ discordUsername: '', discordId: '', displayName: '' }); }}
+                                        style={{ padding: '4px 8px', fontSize: 12 }}
+                                    >✕</button>
+                                </div>
+                                <div className="form-group" style={{ marginBottom: '0.5rem' }}>
+                                    <label style={{ fontSize: 13 }}>Discord Username *</label>
+                                    <input
+                                        className="form-input"
+                                        placeholder="e.g. johndoe"
+                                        value={newChatterForm.discordUsername}
+                                        onChange={e => setNewChatterForm({ ...newChatterForm, discordUsername: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: '0.5rem' }}>
+                                    <label style={{ fontSize: 13 }}>Discord ID <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+                                    <input
+                                        className="form-input"
+                                        placeholder="e.g. 123456789012345678"
+                                        value={newChatterForm.discordId}
+                                        onChange={e => setNewChatterForm({ ...newChatterForm, discordId: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                                    <label style={{ fontSize: 13 }}>Display Name *</label>
+                                    <input
+                                        className="form-input"
+                                        placeholder="e.g. John Doe"
+                                        value={newChatterForm.displayName}
+                                        onChange={e => setNewChatterForm({ ...newChatterForm, displayName: e.target.value })}
+                                    />
+                                </div>
+                                <button
+                                    className="btn btn-primary btn-sm"
+                                    onClick={createChatter}
+                                    disabled={creatingChatter || !newChatterForm.discordUsername || !newChatterForm.displayName}
+                                    style={{ width: '100%' }}
+                                >
+                                    {creatingChatter ? 'Creating...' : '✅ Create & Select Chatter'}
+                                </button>
+                            </div>
+                        )}
 
                         <SearchableSelect
                             label="Model"
