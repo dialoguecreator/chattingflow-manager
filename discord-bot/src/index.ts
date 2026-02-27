@@ -89,6 +89,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const handler = require('./handlers/ticketHandler');
             await (handler.default || handler).handleButton(interaction, action, params);
         }
+
+        // Milk approve/reject
+        if (action === 'milk_approve' || action === 'milk_reject') {
+            const handler = require('./handlers/milkHandler');
+            await (handler.default || handler).handleButton(interaction, action, params);
+        }
     }
 
     // Modal submissions
@@ -113,6 +119,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (action === 'milk_modal') {
             const handler = require('./handlers/milkHandler');
             await (handler.default || handler).handleModal(interaction, params);
+        }
+
+        if (action === 'milk_reject_modal') {
+            const handler = require('./handlers/milkHandler');
+            await (handler.default || handler).handleRejectModal(interaction, params);
         }
     }
 

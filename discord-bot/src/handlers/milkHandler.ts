@@ -1,5 +1,7 @@
 import {
-    ModalSubmitInteraction,
+    ModalSubmitInteraction, ButtonInteraction,
+    ActionRowBuilder, ButtonBuilder, ButtonStyle,
+    ModalBuilder, TextInputBuilder, TextInputStyle,
     TextChannel, EmbedBuilder, MessageFlags
 } from 'discord.js';
 import prisma from '../lib/prisma';
@@ -27,6 +29,13 @@ function parseYesNo(value: string): boolean {
 
 export default {
     async handleModal(interaction: ModalSubmitInteraction, params: string[]) {
+        const [action, ...rest] = [interaction.customId.split(':')[0], ...params];
+
+        // Rejection reason modal
+        if (action === 'milk_reject_modal') {
+            return this.handleRejectModal(interaction, params);
+        }
+
         const [modelId, guildDbId] = params.map(Number);
 
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -128,10 +137,24 @@ export default {
                     hasIssues,
                     issueDescription: hasIssues ? issuesDescription.trim() : null,
                     screenshotPath,
+                    status: 'PENDING',
                 },
             });
 
-            // Post summary embed in #milk channel
+            // Build approve/reject buttons
+            const approveButton = new ButtonBuilder()
+                .setCustomId(`milk_approve:${milkReport.id}`)
+                .setLabel('✅ Approve Milk')
+                .setStyle(ButtonStyle.Success);
+
+            const rejectButton = new ButtonBuilder()
+                .setCustomId(`milk_reject:${milkReport.id}`)
+                .setLabel('❌ Reject Milk')
+                .setStyle(ButtonStyle.Danger);
+
+            const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(approveButton, rejectButton);
+
+            // Post summary embed in #milk channel with buttons
             const summaryEmbed = new EmbedBuilder()
                 .setColor(0x6366F1)
                 .setTitle(`🥛 Milk Report — ${model.name}`)
@@ -144,11 +167,21 @@ export default {
                     { name: '💆 Aftercare', value: aftercareDone ? '✅ Yes' : '❌ No', inline: true },
                     { name: '⚠️ Issues', value: hasIssues ? issuesDescription.trim() : 'None', inline: false },
                     { name: '📸 Screenshot', value: screenshotPath ? '✅ Uploaded' : '❌ Not uploaded', inline: true },
+                    { name: '📋 Status', value: '⏳ Pending Review', inline: true },
                 )
                 .setTimestamp()
-                .setFooter({ text: `Report #${milkReport.id}` });
+                .setFooter({ text: `Report #${milkReport.id} • Supervisors/Managers: Use buttons below to approve or reject` });
 
-            await (channel as TextChannel).send({ embeds: [summaryEmbed] });
+            const sentMessage = await (channel as TextChannel).send({
+                embeds: [summaryEmbed],
+                components: [buttonRow],
+            });
+
+            // Save the discord message ID so we can update it later
+            await prisma.milkReport.update({
+                where: { id: milkReport.id },
+                data: { discordMessageId: sentMessage.id },
+            });
 
             // DM supervisors, managers, admins, founders
             const rolesToNotify = ['Supervisor', 'Manager', 'Admin', 'Founder'];
@@ -168,10 +201,9 @@ export default {
                                     { name: '📝 Notes', value: notesCompleted ? '✅ Yes' : '❌ No', inline: true },
                                     { name: '💆 Aftercare', value: aftercareDone ? '✅ Yes' : '❌ No', inline: true },
                                     { name: '⚠️ Issues', value: hasIssues ? issuesDescription.trim() : 'None', inline: false },
-                                    { name: '📸 Screenshot', value: screenshotPath ? '✅ Uploaded' : '❌ Not uploaded', inline: true },
                                 )
                                 .setTimestamp()
-                                .setFooter({ text: `Report #${milkReport.id} • Check the #milk channel` });
+                                .setFooter({ text: `Report #${milkReport.id} • Check the #milk channel to approve/reject` });
                             await member.send({ embeds: [dmEmbed] });
                         } catch (e) { /* Can't DM this member */ }
                     }
@@ -181,12 +213,208 @@ export default {
             // Confirm to the chatter
             const successEmbed = new EmbedBuilder()
                 .setColor(0x22C55E)
-                .setDescription(`✅ Your milk report for **${subscriberName}** has been submitted!`);
+                .setDescription(`✅ Your milk report for **${subscriberName}** has been submitted and is pending review!`);
             await interaction.followUp({ embeds: [successEmbed], flags: MessageFlags.Ephemeral });
 
         } catch (error) {
             console.error('Milk modal error:', error);
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ An error occurred processing your milk report.');
+            await interaction.editReply({ embeds: [embed] });
+        }
+    },
+
+    async handleButton(interaction: ButtonInteraction, action: string, params: string[]) {
+        const milkId = parseInt(params[0]);
+        const member = interaction.member as any;
+
+        // Check permissions — only Supervisor/Manager/Admin/Founder
+        const hasPermission = member.roles.cache.some(
+            (r: any) => ['Supervisor', 'Manager', 'Admin', 'Founder'].includes(r.name)
+        );
+        if (!hasPermission) {
+            const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Only Supervisors/Managers/Admins can approve or reject milk reports.');
+            return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+        }
+
+        try {
+            const milk = await prisma.milkReport.findUnique({
+                where: { id: milkId },
+                include: { user: true, model: true },
+            });
+            if (!milk) {
+                const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Milk report not found.');
+                return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            }
+            if (milk.status !== 'PENDING') {
+                const embed = new EmbedBuilder().setColor(0xEF4444).setDescription(`❌ This report has already been ${milk.status.toLowerCase()}.`);
+                return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            }
+
+            if (action === 'milk_approve') {
+                // Approve directly
+                const reviewer = await prisma.user.findUnique({ where: { discordId: interaction.user.id } });
+
+                await prisma.milkReport.update({
+                    where: { id: milkId },
+                    data: { status: 'APPROVED', reviewedById: reviewer?.id },
+                });
+
+                // Update original embed
+                const approvedEmbed = new EmbedBuilder()
+                    .setColor(0x22C55E)
+                    .setTitle(`🥛 Milk Report — ${milk.model.name}`)
+                    .addFields(
+                        { name: '👤 Chatter', value: `<@${milk.user.discordId}>`, inline: true },
+                        { name: '📁 Model', value: milk.model.name, inline: true },
+                        { name: '🧑 Subscriber', value: milk.subscriberName, inline: true },
+                        { name: '💰 Amount Spent', value: `$${milk.amountSpent.toFixed(2)}`, inline: true },
+                        { name: '📝 Notes', value: milk.notesCompleted ? '✅ Yes' : '❌ No', inline: true },
+                        { name: '💆 Aftercare', value: milk.aftercareDone ? '✅ Yes' : '❌ No', inline: true },
+                        { name: '⚠️ Issues', value: milk.hasIssues ? (milk.issueDescription || 'Yes') : 'None', inline: false },
+                        { name: '✅ Approved', value: `by <@${interaction.user.id}>`, inline: true },
+                    )
+                    .setTimestamp()
+                    .setFooter({ text: `Report #${milk.id}` });
+
+                await interaction.update({
+                    embeds: [approvedEmbed],
+                    components: [], // Remove buttons
+                });
+
+                // DM the chatter that their milk was approved
+                if (milk.user.discordId) {
+                    try {
+                        const guild = interaction.guild!;
+                        const chatter = await guild.members.fetch(milk.user.discordId);
+                        const dmEmbed = new EmbedBuilder()
+                            .setColor(0x22C55E)
+                            .setTitle('✅ Milk Report Approved!')
+                            .addFields(
+                                { name: '📁 Model', value: milk.model.name, inline: true },
+                                { name: '🧑 Subscriber', value: milk.subscriberName, inline: true },
+                                { name: '💰 Amount', value: `$${milk.amountSpent.toFixed(2)}`, inline: true },
+                                { name: 'Approved by', value: interaction.user.username, inline: true },
+                            )
+                            .setDescription('Your milk report has been approved! You can claim this amount.')
+                            .setTimestamp();
+                        await chatter.send({ embeds: [dmEmbed] });
+                    } catch (e) { /* Can't DM */ }
+                }
+            }
+
+            if (action === 'milk_reject') {
+                // Show modal for rejection reason
+                const modal = new ModalBuilder()
+                    .setCustomId(`milk_reject_modal:${milkId}`)
+                    .setTitle('Reject Milk Report');
+
+                const reasonInput = new TextInputBuilder()
+                    .setCustomId('reject_reason')
+                    .setLabel('Reason for rejection')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setPlaceholder('Explain what needs to be fixed for this milk to be valid...')
+                    .setRequired(true)
+                    .setMaxLength(1500);
+
+                modal.addComponents(
+                    new ActionRowBuilder<TextInputBuilder>().addComponents(reasonInput),
+                );
+
+                await interaction.showModal(modal);
+            }
+        } catch (error) {
+            console.error('Milk button error:', error);
+            const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ An error occurred.');
+            await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+        }
+    },
+
+    async handleRejectModal(interaction: ModalSubmitInteraction, params: string[]) {
+        const milkId = parseInt(params[0]);
+
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+        try {
+            const rejectReason = interaction.fields.getTextInputValue('reject_reason');
+
+            const milk = await prisma.milkReport.findUnique({
+                where: { id: milkId },
+                include: { user: true, model: true },
+            });
+            if (!milk) {
+                const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Milk report not found.');
+                return interaction.editReply({ embeds: [embed] });
+            }
+
+            const reviewer = await prisma.user.findUnique({ where: { discordId: interaction.user.id } });
+
+            await prisma.milkReport.update({
+                where: { id: milkId },
+                data: {
+                    status: 'REJECTED',
+                    reviewedById: reviewer?.id,
+                    reviewNote: rejectReason,
+                },
+            });
+
+            // Find the original message and update it
+            const channel = interaction.channel!;
+            if (milk.discordMessageId) {
+                try {
+                    const originalMessage = await (channel as TextChannel).messages.fetch(milk.discordMessageId);
+                    const rejectedEmbed = new EmbedBuilder()
+                        .setColor(0xEF4444)
+                        .setTitle(`🥛 Milk Report — ${milk.model.name}`)
+                        .addFields(
+                            { name: '👤 Chatter', value: `<@${milk.user.discordId}>`, inline: true },
+                            { name: '📁 Model', value: milk.model.name, inline: true },
+                            { name: '🧑 Subscriber', value: milk.subscriberName, inline: true },
+                            { name: '💰 Amount Spent', value: `$${milk.amountSpent.toFixed(2)}`, inline: true },
+                            { name: '📝 Notes', value: milk.notesCompleted ? '✅ Yes' : '❌ No', inline: true },
+                            { name: '💆 Aftercare', value: milk.aftercareDone ? '✅ Yes' : '❌ No', inline: true },
+                            { name: '⚠️ Issues', value: milk.hasIssues ? (milk.issueDescription || 'Yes') : 'None', inline: false },
+                            { name: '❌ Rejected', value: `by <@${interaction.user.id}>`, inline: true },
+                            { name: '📝 Reason', value: rejectReason, inline: false },
+                        )
+                        .setTimestamp()
+                        .setFooter({ text: `Report #${milk.id}` });
+
+                    await originalMessage.edit({
+                        embeds: [rejectedEmbed],
+                        components: [], // Remove buttons
+                    });
+                } catch (e) { console.log('Could not update original message:', e); }
+            }
+
+            // DM the chatter that their milk was rejected
+            if (milk.user.discordId) {
+                try {
+                    const guild = interaction.guild!;
+                    const chatter = await guild.members.fetch(milk.user.discordId);
+                    const dmEmbed = new EmbedBuilder()
+                        .setColor(0xEF4444)
+                        .setTitle('❌ Milk Report Rejected')
+                        .addFields(
+                            { name: '📁 Model', value: milk.model.name, inline: true },
+                            { name: '🧑 Subscriber', value: milk.subscriberName, inline: true },
+                            { name: '💰 Amount', value: `$${milk.amountSpent.toFixed(2)}`, inline: true },
+                            { name: 'Rejected by', value: interaction.user.username, inline: true },
+                            { name: '📝 Reason', value: rejectReason, inline: false },
+                        )
+                        .setDescription('Please review the reason above and resubmit a corrected milk report.')
+                        .setTimestamp();
+                    await chatter.send({ embeds: [dmEmbed] });
+                } catch (e) { /* Can't DM */ }
+            }
+
+            const successEmbed = new EmbedBuilder()
+                .setColor(0x22C55E)
+                .setDescription(`✅ Milk report #${milkId} has been rejected. The chatter has been notified.`);
+            await interaction.editReply({ embeds: [successEmbed] });
+
+        } catch (error) {
+            console.error('Milk reject modal error:', error);
+            const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ An error occurred.');
             await interaction.editReply({ embeds: [embed] });
         }
     },
