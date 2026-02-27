@@ -109,6 +109,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const handler = require('./handlers/ticketHandler');
             await (handler.default || handler).handleModal(interaction, params);
         }
+
+        if (action === 'milk_modal') {
+            const handler = require('./handlers/milkHandler');
+            await (handler.default || handler).handleModal(interaction, params);
+        }
     }
 
     // Select menu interactions

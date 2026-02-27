@@ -37,6 +37,7 @@ model User {
   tickets            Ticket[]
   payoutEntries      PayoutEntry[]
   invitesCreated     InviteToken[]
+  milkReports        MilkReport[]
 }
 
 // ─── Discord Guilds ───────────────────────────────────────
@@ -50,6 +51,7 @@ model Guild {
   clockRecords ClockRecord[]
   massMessageRequests MassMessageRequest[]
   tickets   Ticket[]
+  milkReports MilkReport[]
 }
 
 // ─── OF Models ────────────────────────────────────────────
@@ -70,6 +72,7 @@ model OnlyFansModel {
   chargebacks     Chargeback[]
   massMessageRequests MassMessageRequest[]
   tickets         Ticket[]
+  milkReports     MilkReport[]
 
   @@unique([name, guildId])
 }
@@ -301,4 +304,24 @@ model InviteToken {
   createdAt   DateTime  @default(now())
 
   createdBy   User @relation(fields: [createdById], references: [id])
+}
+
+// ─── Milk Reports ─────────────────────────────────────────
+model MilkReport {
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  modelId           Int
+  guildId           Int
+  subscriberName    String
+  amountSpent       Float
+  notesCompleted    Boolean  @default(false)
+  aftercareDone     Boolean  @default(false)
+  hasIssues         Boolean  @default(false)
+  issueDescription  String?
+  screenshotPath    String?
+  createdAt         DateTime @default(now())
+
+  user  User          @relation(fields: [userId], references: [id])
+  model OnlyFansModel @relation(fields: [modelId], references: [id])
+  guild Guild         @relation(fields: [guildId], references: [id])
 }
