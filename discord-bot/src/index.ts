@@ -125,6 +125,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const handler = require('./handlers/milkHandler');
             await (handler.default || handler).handleRejectModal(interaction, params);
         }
+
+        if (action === 'adminco_modal') {
+            const handler = require('./handlers/admincoHandler');
+            await (handler.default || handler).handleModal(interaction, params);
+        }
     }
 
     // Select menu interactions
@@ -144,6 +149,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (interaction.customId === 'ticket_purpose') {
             const handler = require('./handlers/ticketHandler');
             await (handler.default || handler).handleSelect(interaction);
+        }
+
+        if (action === 'adminco_select') {
+            const handler = require('./handlers/admincoHandler');
+            await (handler.default || handler).handleSelectMenu(interaction, params);
         }
     }
 });
