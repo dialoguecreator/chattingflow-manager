@@ -78,23 +78,33 @@ export default {
             await interaction.reply({ embeds: [embed] });
 
             // Timeout to check exceeded break
+            const breakMsgRef = await interaction.fetchReply();
+            const breakJumpUrl = `https://discord.com/channels/${guild.id}/${(channel as any).id}/${breakMsgRef.id}`;
+
             setTimeout(async () => {
                 try {
                     const currentBreak = await prisma.breakRecord.findUnique({ where: { id: breakRecord.id } });
                     if (currentBreak && !currentBreak.endTime) {
                         await prisma.breakRecord.update({ where: { id: breakRecord.id }, data: { exceeded: true } });
 
+                        // Fetch ALL guild members to ensure we don't miss anyone
+                        await guild.members.fetch();
+
                         const rolesToNotify = ['Admin', 'Manager', 'Supervisor'];
                         for (const roleName of rolesToNotify) {
                             const role = guild.roles.cache.find(r => r.name === roleName);
                             if (role) {
-                                for (const [, member] of role.members) {
+                                const membersWithRole = guild.members.cache.filter(m => m.roles.cache.has(role.id));
+                                for (const [, member] of membersWithRole) {
                                     try {
                                         const alertEmbed = new EmbedBuilder()
                                             .setColor(0xEF4444)
                                             .setTitle('⚠️ Break Exceeded Alert')
                                             .setDescription(`**${interaction.user.username}** (<@${discordUserId}>) has exceeded their 15-minute break on **${model.name}**.`)
-                                            .addFields({ name: 'Break Started', value: `<t:${timestamp}:T>` })
+                                            .addFields(
+                                                { name: 'Break Started', value: `<t:${timestamp}:T>` },
+                                                { name: '🔗 Jump to Break', value: `[Click here](${breakJumpUrl})` },
+                                            )
                                             .setTimestamp();
                                         await member.send({ embeds: [alertEmbed] });
                                     } catch (e) { /* Can't DM */ }
