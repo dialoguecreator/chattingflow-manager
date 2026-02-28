@@ -185,10 +185,18 @@ export default {
 
             // DM supervisors, managers, admins, founders
             const rolesToNotify = ['Supervisor', 'Manager', 'Admin', 'Founder'];
+
+            // Build jump URL to the milk report message
+            const jumpUrl = `https://discord.com/channels/${guild.id}/${(channel as TextChannel).id}/${sentMessage.id}`;
+
+            // Fetch ALL guild members to ensure we don't miss anyone (cache is often incomplete)
+            await guild.members.fetch();
+
             for (const roleName of rolesToNotify) {
                 const role = guild.roles.cache.find(r => r.name === roleName);
                 if (role) {
-                    for (const [, member] of role.members) {
+                    const membersWithRole = guild.members.cache.filter(m => m.roles.cache.has(role.id));
+                    for (const [, member] of membersWithRole) {
                         try {
                             const dmEmbed = new EmbedBuilder()
                                 .setColor(0xF59E0B)
@@ -201,9 +209,10 @@ export default {
                                     { name: '📝 Notes', value: notesCompleted ? '✅ Yes' : '❌ No', inline: true },
                                     { name: '💆 Aftercare', value: aftercareDone ? '✅ Yes' : '❌ No', inline: true },
                                     { name: '⚠️ Issues', value: hasIssues ? issuesDescription.trim() : 'None', inline: false },
+                                    { name: '🔗 Jump to Report', value: `[Click here to go to the report](${jumpUrl})` },
                                 )
                                 .setTimestamp()
-                                .setFooter({ text: `Report #${milkReport.id} • Check the #milk channel to approve/reject` });
+                                .setFooter({ text: `Report #${milkReport.id}` });
                             await member.send({ embeds: [dmEmbed] });
                         } catch (e) { /* Can't DM this member */ }
                     }

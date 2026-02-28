@@ -93,10 +93,29 @@ export default {
 
             // DM supervisors and managers
             const rolesToNotify = ['Supervisor', 'Manager'];
+
+            // Build jump URL from the sentMessage posted in #mass-message
+            let jumpUrl: string | undefined;
+            if (category && category.type === ChannelType.GuildCategory) {
+                const mmChannel = category.children.cache.find(
+                    ch => ch.name === 'mass-message' && ch.type === ChannelType.GuildText
+                );
+                if (mmChannel) {
+                    const updatedMma = await prisma.massMessageRequest.findUnique({ where: { id: mmaRequest.id } });
+                    if (updatedMma?.discordMessageId) {
+                        jumpUrl = `https://discord.com/channels/${guild.id}/${mmChannel.id}/${updatedMma.discordMessageId}`;
+                    }
+                }
+            }
+
+            // Fetch ALL guild members to ensure we don't miss anyone (cache is often incomplete)
+            await guild.members.fetch();
+
             for (const roleName of rolesToNotify) {
                 const role = guild.roles.cache.find(r => r.name === roleName);
                 if (role) {
-                    for (const [, member] of role.members) {
+                    const membersWithRole = guild.members.cache.filter(m => m.roles.cache.has(role.id));
+                    for (const [, member] of membersWithRole) {
                         try {
                             const dmEmbed = new EmbedBuilder()
                                 .setColor(0xF59E0B)
@@ -106,7 +125,14 @@ export default {
                                     { name: '📁 Model', value: model.name, inline: true },
                                     { name: '💬 Idea', value: message },
                                 )
-                                .setFooter({ text: 'Check the #mass-message channel to approve/reject' });
+                                .setTimestamp();
+
+                            if (jumpUrl) {
+                                dmEmbed.addFields({ name: '🔗 Jump to Request', value: `[Click here to go to the request](${jumpUrl})` });
+                            } else {
+                                dmEmbed.setFooter({ text: 'Check the #mass-message channel to approve/reject' });
+                            }
+
                             await member.send({ embeds: [dmEmbed] });
                         } catch (e) { /* Can't DM */ }
                     }
