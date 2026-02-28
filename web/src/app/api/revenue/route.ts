@@ -37,7 +37,7 @@ export async function GET(req: Request) {
             where: dateFilter,
             select: {
                 modelId: true,
-                totalGross: true,
+                splitAmount: true,
             },
         });
 
@@ -63,7 +63,7 @@ export async function GET(req: Request) {
             const modelInvoices = invoices.filter(inv => inv.modelId === model.id);
             const modelChargebacks = chargebacks.filter(cb => cb.modelId === model.id);
 
-            const totalSales = modelInvoices.reduce((sum, inv) => sum + inv.totalGross, 0);
+            const totalSales = modelInvoices.reduce((sum, inv) => sum + inv.splitAmount, 0);
             const totalChargebacks = modelChargebacks.reduce((sum, cb) => sum + cb.amount, 0);
             const netRevenue = totalSales - totalChargebacks;
 
