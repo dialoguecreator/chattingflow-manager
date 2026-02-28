@@ -122,7 +122,7 @@ export default function InvoicesPage() {
     const [chatters, setChatters] = useState<any[]>([]);
     const [models, setModels] = useState<any[]>([]);
     const [addForm, setAddForm] = useState({
-        userId: '', modelId: '', clockIn: '', clockOut: '', totalGross: '', splitCount: '1', shiftSummary: ''
+        userId: '', userId2: '', modelId: '', clockIn: '', clockOut: '', totalGross: '', splitCount: '1', shiftSummary: ''
     });
 
     // Inline add chatter
@@ -154,6 +154,15 @@ export default function InvoicesPage() {
             alert(`Error: ${e.message || 'Network error'}`);
         }
         setCreatingChatter(false);
+    };
+
+    const setSecondChatter = (val: string) => {
+        if (val === addForm.userId) return; // can't select the same chatter
+        setAddForm(prev => ({ ...prev, userId2: val, splitCount: val ? '2' : '1' }));
+    };
+
+    const removeSecondChatter = () => {
+        setAddForm(prev => ({ ...prev, userId2: '', splitCount: '1' }));
     };
 
     useEffect(() => {
@@ -202,7 +211,7 @@ export default function InvoicesPage() {
                 return;
             }
             setShowAdd(false);
-            setAddForm({ userId: '', modelId: '', clockIn: '', clockOut: '', totalGross: '', splitCount: '1', shiftSummary: '' });
+            setAddForm({ userId: '', userId2: '', modelId: '', clockIn: '', clockOut: '', totalGross: '', splitCount: '1', shiftSummary: '' });
             fetchInvoices(page);
         } catch (e: any) {
             alert(`Error: ${e.message || 'Network error'}`);
@@ -431,6 +440,36 @@ export default function InvoicesPage() {
                             </div>
                         )}
 
+                        {/* Second Chatter (optional, for split) */}
+                        {addForm.userId2 ? (
+                            <div className="form-group">
+                                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    Split Partner
+                                    <button
+                                        className="btn btn-sm btn-secondary"
+                                        onClick={removeSecondChatter}
+                                        style={{ padding: '2px 8px', fontSize: 11 }}
+                                    >✕ Remove</button>
+                                </label>
+                                <SearchableSelect
+                                    label=""
+                                    placeholder="Search split partner..."
+                                    items={chatters.filter((c: any) => String(c.id) !== addForm.userId).map((c: any) => ({ id: c.id, label: `${c.firstName} ${c.lastName} (${c.username})` }))}
+                                    value={addForm.userId2}
+                                    onChange={setSecondChatter}
+                                />
+                            </div>
+                        ) : (
+                            <button
+                                className="btn btn-sm btn-secondary"
+                                onClick={() => setAddForm(prev => ({ ...prev, userId2: ' ' }))}
+                                style={{ marginBottom: '0.5rem', fontSize: 13 }}
+                                disabled={!addForm.userId}
+                            >
+                                👥 Add Split Partner
+                            </button>
+                        )}
+
                         <SearchableSelect
                             label="Model"
                             placeholder="Search model..."
@@ -457,7 +496,7 @@ export default function InvoicesPage() {
                             </div>
                             <div className="form-group">
                                 <label>Split Count</label>
-                                <input type="number" min="1" value={addForm.splitCount} onChange={e => setAddForm({ ...addForm, splitCount: e.target.value })} />
+                                <input type="number" min="1" value={addForm.splitCount} onChange={e => setAddForm({ ...addForm, splitCount: e.target.value })} disabled={!!addForm.userId2.trim()} />
                             </div>
                         </div>
 

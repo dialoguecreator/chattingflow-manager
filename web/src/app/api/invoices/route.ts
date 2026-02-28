@@ -61,9 +61,10 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     try {
-        const { userId, modelId, clockIn, clockOut, totalGross, splitCount, shiftSummary } = await req.json();
+        const { userId, userId2, modelId, clockIn, clockOut, totalGross, splitCount, shiftSummary } = await req.json();
 
-        const splits = parseInt(splitCount) || 1;
+        const hasPartner = userId2 && userId2.trim() && userId2 !== userId;
+        const splits = hasPartner ? 2 : (parseInt(splitCount) || 1);
         const gross = parseFloat(totalGross) || 0;
         const splitAmount = gross / splits;
 
@@ -74,7 +75,7 @@ export async function POST(req: Request) {
         const user = await prisma.user.findUnique({ where: { id: parseInt(userId) } });
         if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-        // Create clock record
+        // Create clock record for first user
         const clockRecord = await prisma.clockRecord.create({
             data: {
                 userId: parseInt(userId),
@@ -87,7 +88,7 @@ export async function POST(req: Request) {
             },
         });
 
-        // Create invoice
+        // Create invoice for first user
         const invoice = await prisma.invoice.create({
             data: {
                 clockRecordId: clockRecord.id,
@@ -100,7 +101,38 @@ export async function POST(req: Request) {
             },
         });
 
-        return NextResponse.json({ invoice });
+        // If split partner, create invoice for second user too
+        let invoice2 = null;
+        if (hasPartner) {
+            const user2 = await prisma.user.findUnique({ where: { id: parseInt(userId2) } });
+            if (!user2) return NextResponse.json({ error: 'Split partner not found' }, { status: 404 });
+
+            const clockRecord2 = await prisma.clockRecord.create({
+                data: {
+                    userId: parseInt(userId2),
+                    modelId: parseInt(modelId),
+                    guildId: model.guildId,
+                    discordUserId: user2.discordId || `manual_${user2.id}`,
+                    clockIn: new Date(clockIn),
+                    clockOut: new Date(clockOut),
+                    status: 'COMPLETED',
+                },
+            });
+
+            invoice2 = await prisma.invoice.create({
+                data: {
+                    clockRecordId: clockRecord2.id,
+                    userId: parseInt(userId2),
+                    modelId: parseInt(modelId),
+                    totalGross: gross,
+                    splitCount: splits,
+                    splitAmount,
+                    shiftSummary: shiftSummary || null,
+                },
+            });
+        }
+
+        return NextResponse.json({ invoice, invoice2 });
     } catch (error) {
         console.error('Manual invoice creation error:', error);
         return NextResponse.json({ error: 'Failed to create invoice' }, { status: 500 });
