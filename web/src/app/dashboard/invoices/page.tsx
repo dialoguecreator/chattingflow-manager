@@ -124,6 +124,7 @@ export default function InvoicesPage() {
     const [addForm, setAddForm] = useState({
         userId: '', userId2: '', modelId: '', clockIn: '', clockOut: '', totalGross: '', splitCount: '1', shiftSummary: ''
     });
+    const [showSplitPartner, setShowSplitPartner] = useState(false);
 
     // Inline add chatter
     const [showNewChatter, setShowNewChatter] = useState(false);
@@ -157,12 +158,13 @@ export default function InvoicesPage() {
     };
 
     const setSecondChatter = (val: string) => {
-        if (val === addForm.userId) return; // can't select the same chatter
+        if (val === addForm.userId) return;
         setAddForm(prev => ({ ...prev, userId2: val, splitCount: val ? '2' : '1' }));
     };
 
     const removeSecondChatter = () => {
         setAddForm(prev => ({ ...prev, userId2: '', splitCount: '1' }));
+        setShowSplitPartner(false);
     };
 
     useEffect(() => {
@@ -199,10 +201,12 @@ export default function InvoicesPage() {
     const addInvoice = async () => {
         setSaving(true);
         try {
+            // Clean userId2 before sending
+            const payload = { ...addForm, userId2: addForm.userId2.trim() || '' };
             const res = await fetch('/api/invoices', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(addForm),
+                body: JSON.stringify(payload),
             });
             const data = await res.json();
             if (!res.ok) {
@@ -211,6 +215,7 @@ export default function InvoicesPage() {
                 return;
             }
             setShowAdd(false);
+            setShowSplitPartner(false);
             setAddForm({ userId: '', userId2: '', modelId: '', clockIn: '', clockOut: '', totalGross: '', splitCount: '1', shiftSummary: '' });
             fetchInvoices(page);
         } catch (e: any) {
@@ -382,7 +387,7 @@ export default function InvoicesPage() {
                             placeholder="Search chatter..."
                             items={chatters.map((c: any) => ({ id: c.id, label: `${c.firstName} ${c.lastName} (${c.username})` }))}
                             value={addForm.userId}
-                            onChange={val => setAddForm({ ...addForm, userId: val })}
+                            onChange={val => setAddForm(prev => ({ ...prev, userId: val }))}
                             onAddNew={() => setShowNewChatter(true)}
                         />
 
@@ -441,7 +446,7 @@ export default function InvoicesPage() {
                         )}
 
                         {/* Second Chatter (optional, for split) */}
-                        {addForm.userId2 ? (
+                        {showSplitPartner ? (
                             <div className="form-group">
                                 <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     Split Partner
@@ -462,7 +467,7 @@ export default function InvoicesPage() {
                         ) : (
                             <button
                                 className="btn btn-sm btn-secondary"
-                                onClick={() => setAddForm(prev => ({ ...prev, userId2: ' ' }))}
+                                onClick={() => setShowSplitPartner(true)}
                                 style={{ marginBottom: '0.5rem', fontSize: 13 }}
                                 disabled={!addForm.userId}
                             >
@@ -475,34 +480,34 @@ export default function InvoicesPage() {
                             placeholder="Search model..."
                             items={models.map((m: any) => ({ id: m.id, label: m.name }))}
                             value={addForm.modelId}
-                            onChange={val => setAddForm({ ...addForm, modelId: val })}
+                            onChange={val => setAddForm(prev => ({ ...prev, modelId: val }))}
                         />
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                             <div className="form-group">
                                 <label>Clock In</label>
-                                <input type="datetime-local" value={addForm.clockIn} onChange={e => setAddForm({ ...addForm, clockIn: e.target.value })} />
+                                <input type="datetime-local" value={addForm.clockIn} onChange={e => setAddForm(prev => ({ ...prev, clockIn: e.target.value }))} />
                             </div>
                             <div className="form-group">
                                 <label>Clock Out</label>
-                                <input type="datetime-local" value={addForm.clockOut} onChange={e => setAddForm({ ...addForm, clockOut: e.target.value })} />
+                                <input type="datetime-local" value={addForm.clockOut} onChange={e => setAddForm(prev => ({ ...prev, clockOut: e.target.value }))} />
                             </div>
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
                             <div className="form-group">
                                 <label>Total Sales ($)</label>
-                                <input type="number" step="0.01" value={addForm.totalGross} onChange={e => setAddForm({ ...addForm, totalGross: e.target.value })} />
+                                <input type="number" step="0.01" value={addForm.totalGross} onChange={e => setAddForm(prev => ({ ...prev, totalGross: e.target.value }))} />
                             </div>
                             <div className="form-group">
                                 <label>Split Count</label>
-                                <input type="number" min="1" value={addForm.splitCount} onChange={e => setAddForm({ ...addForm, splitCount: e.target.value })} disabled={!!addForm.userId2.trim()} />
+                                <input type="number" min="1" value={addForm.splitCount} onChange={e => setAddForm(prev => ({ ...prev, splitCount: e.target.value }))} disabled={showSplitPartner} />
                             </div>
                         </div>
 
                         <div className="form-group">
                             <label>Shift Summary</label>
-                            <textarea rows={3} value={addForm.shiftSummary} onChange={e => setAddForm({ ...addForm, shiftSummary: e.target.value })} />
+                            <textarea rows={3} value={addForm.shiftSummary} onChange={e => setAddForm(prev => ({ ...prev, shiftSummary: e.target.value }))} />
                         </div>
 
                         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
