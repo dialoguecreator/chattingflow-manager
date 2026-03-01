@@ -206,33 +206,38 @@ export default {
                 await guild.members.fetch();
 
                 const rolesToNotify = ['Supervisor', 'Admin', 'Manager', 'Founder'];
+                const notifyMembers = new Map<string, any>();
                 for (const roleName of rolesToNotify) {
                     const role = guild.roles.cache.find(r => r.name === roleName);
                     if (role) {
                         const membersWithRole = guild.members.cache.filter(m => m.roles.cache.has(role.id));
-                        for (const [, member] of membersWithRole) {
-                            try {
-                                const dmEmbed = new EmbedBuilder()
-                                    .setColor(purpose === 'EMERGENCY' ? 0xEF4444 : 0xF59E0B)
-                                    .setTitle(`${emoji} ${title} — ${model.name}`)
-                                    .addFields(
-                                        { name: '👤 From', value: interaction.user.username, inline: true },
-                                        { name: '📁 Model', value: model.name, inline: true },
-                                        ...Object.entries(data).map(([k, v]) => ({ name: k.charAt(0).toUpperCase() + k.slice(1), value: v })),
-                                    )
-                                    .setTimestamp();
-
-                                if (jumpUrl) {
-                                    dmEmbed.addFields({ name: '🔗 Jump to Ticket', value: `[Click here to review](${jumpUrl})` });
-                                }
-                                if (needsApproval) {
-                                    dmEmbed.setFooter({ text: 'Use the buttons on the message to approve or reject' });
-                                }
-
-                                await member.send({ embeds: [dmEmbed] });
-                            } catch (e) { /* Can't DM */ }
+                        for (const [id, member] of membersWithRole) {
+                            notifyMembers.set(id, member);
                         }
                     }
+                }
+
+                for (const [, member] of notifyMembers) {
+                    try {
+                        const dmEmbed = new EmbedBuilder()
+                            .setColor(purpose === 'EMERGENCY' ? 0xEF4444 : 0xF59E0B)
+                            .setTitle(`${emoji} ${title} — ${model.name}`)
+                            .addFields(
+                                { name: '👤 From', value: interaction.user.username, inline: true },
+                                { name: '📁 Model', value: model.name, inline: true },
+                                ...Object.entries(data).map(([k, v]) => ({ name: k.charAt(0).toUpperCase() + k.slice(1), value: v })),
+                            )
+                            .setTimestamp();
+
+                        if (jumpUrl) {
+                            dmEmbed.addFields({ name: '🔗 Jump to Ticket', value: `[Click here to review](${jumpUrl})` });
+                        }
+                        if (needsApproval) {
+                            dmEmbed.setFooter({ text: 'Use the buttons on the message to approve or reject' });
+                        }
+
+                        await member.send({ embeds: [dmEmbed] });
+                    } catch (e) { /* Can't DM */ }
                 }
             }
 

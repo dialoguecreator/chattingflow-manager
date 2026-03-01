@@ -91,25 +91,30 @@ export default {
                         await guild.members.fetch();
 
                         const rolesToNotify = ['Admin', 'Manager', 'Supervisor'];
+                        const notifyMembers = new Map<string, any>();
                         for (const roleName of rolesToNotify) {
                             const role = guild.roles.cache.find(r => r.name === roleName);
                             if (role) {
                                 const membersWithRole = guild.members.cache.filter(m => m.roles.cache.has(role.id));
-                                for (const [, member] of membersWithRole) {
-                                    try {
-                                        const alertEmbed = new EmbedBuilder()
-                                            .setColor(0xEF4444)
-                                            .setTitle('⚠️ Break Exceeded Alert')
-                                            .setDescription(`**${interaction.user.username}** (<@${discordUserId}>) has exceeded their 15-minute break on **${model.name}**.`)
-                                            .addFields(
-                                                { name: 'Break Started', value: `<t:${timestamp}:T>` },
-                                                { name: '🔗 Jump to Break', value: `[Click here](${breakJumpUrl})` },
-                                            )
-                                            .setTimestamp();
-                                        await member.send({ embeds: [alertEmbed] });
-                                    } catch (e) { /* Can't DM */ }
+                                for (const [id, member] of membersWithRole) {
+                                    notifyMembers.set(id, member);
                                 }
                             }
+                        }
+
+                        for (const [, member] of notifyMembers) {
+                            try {
+                                const alertEmbed = new EmbedBuilder()
+                                    .setColor(0xEF4444)
+                                    .setTitle('⚠️ Break Exceeded Alert')
+                                    .setDescription(`**${interaction.user.username}** (<@${discordUserId}>) has exceeded their 15-minute break on **${model.name}**.`)
+                                    .addFields(
+                                        { name: 'Break Started', value: `<t:${timestamp}:T>` },
+                                        { name: '🔗 Jump to Break', value: `[Click here](${breakJumpUrl})` },
+                                    )
+                                    .setTimestamp();
+                                await member.send({ embeds: [alertEmbed] });
+                            } catch (e) { /* Can't DM */ }
                         }
                     }
                 } catch (e) { console.error('Break check error:', e); }

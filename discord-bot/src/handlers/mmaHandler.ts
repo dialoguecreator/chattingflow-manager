@@ -111,32 +111,38 @@ export default {
             // Fetch ALL guild members to ensure we don't miss anyone (cache is often incomplete)
             await guild.members.fetch();
 
+            // Collect unique members across all roles (prevent duplicate DMs)
+            const notifyMembers = new Map<string, any>();
             for (const roleName of rolesToNotify) {
                 const role = guild.roles.cache.find(r => r.name === roleName);
                 if (role) {
                     const membersWithRole = guild.members.cache.filter(m => m.roles.cache.has(role.id));
-                    for (const [, member] of membersWithRole) {
-                        try {
-                            const dmEmbed = new EmbedBuilder()
-                                .setColor(0xF59E0B)
-                                .setTitle('📨 New Mass Message Request')
-                                .addFields(
-                                    { name: '👤 From', value: interaction.user.username, inline: true },
-                                    { name: '📁 Model', value: model.name, inline: true },
-                                    { name: '💬 Idea', value: message },
-                                )
-                                .setTimestamp();
-
-                            if (jumpUrl) {
-                                dmEmbed.addFields({ name: '🔗 Jump to Request', value: `[Click here to go to the request](${jumpUrl})` });
-                            } else {
-                                dmEmbed.setFooter({ text: 'Check the #mass-message channel to approve/reject' });
-                            }
-
-                            await member.send({ embeds: [dmEmbed] });
-                        } catch (e) { /* Can't DM */ }
+                    for (const [id, member] of membersWithRole) {
+                        notifyMembers.set(id, member);
                     }
                 }
+            }
+
+            for (const [, member] of notifyMembers) {
+                try {
+                    const dmEmbed = new EmbedBuilder()
+                        .setColor(0xF59E0B)
+                        .setTitle('📨 New Mass Message Request')
+                        .addFields(
+                            { name: '👤 From', value: interaction.user.username, inline: true },
+                            { name: '📁 Model', value: model.name, inline: true },
+                            { name: '💬 Idea', value: message },
+                        )
+                        .setTimestamp();
+
+                    if (jumpUrl) {
+                        dmEmbed.addFields({ name: '🔗 Jump to Request', value: `[Click here to go to the request](${jumpUrl})` });
+                    } else {
+                        dmEmbed.setFooter({ text: 'Check the #mass-message channel to approve/reject' });
+                    }
+
+                    await member.send({ embeds: [dmEmbed] });
+                } catch (e) { /* Can't DM */ }
             }
 
             const successEmbed = new EmbedBuilder()

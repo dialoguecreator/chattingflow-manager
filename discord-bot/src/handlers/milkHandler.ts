@@ -192,31 +192,37 @@ export default {
             // Fetch ALL guild members to ensure we don't miss anyone (cache is often incomplete)
             await guild.members.fetch();
 
+            // Collect unique members across all roles (prevent duplicate DMs)
+            const notifyMembers = new Map<string, any>();
             for (const roleName of rolesToNotify) {
                 const role = guild.roles.cache.find(r => r.name === roleName);
                 if (role) {
                     const membersWithRole = guild.members.cache.filter(m => m.roles.cache.has(role.id));
-                    for (const [, member] of membersWithRole) {
-                        try {
-                            const dmEmbed = new EmbedBuilder()
-                                .setColor(0xF59E0B)
-                                .setTitle(`🥛 New Milk Report — ${model.name}`)
-                                .addFields(
-                                    { name: '👤 Chatter', value: interaction.user.username, inline: true },
-                                    { name: '📁 Model', value: model.name, inline: true },
-                                    { name: '🧑 Subscriber', value: subscriberName, inline: true },
-                                    { name: '💰 Amount Spent', value: `$${amountSpent.toFixed(2)}`, inline: true },
-                                    { name: '📝 Notes', value: notesCompleted ? '✅ Yes' : '❌ No', inline: true },
-                                    { name: '💆 Aftercare', value: aftercareDone ? '✅ Yes' : '❌ No', inline: true },
-                                    { name: '⚠️ Issues', value: hasIssues ? issuesDescription.trim() : 'None', inline: false },
-                                    { name: '🔗 Jump to Report', value: `[Click here to go to the report](${jumpUrl})` },
-                                )
-                                .setTimestamp()
-                                .setFooter({ text: `Report #${milkReport.id}` });
-                            await member.send({ embeds: [dmEmbed] });
-                        } catch (e) { /* Can't DM this member */ }
+                    for (const [id, member] of membersWithRole) {
+                        notifyMembers.set(id, member);
                     }
                 }
+            }
+
+            for (const [, member] of notifyMembers) {
+                try {
+                    const dmEmbed = new EmbedBuilder()
+                        .setColor(0xF59E0B)
+                        .setTitle(`🥛 New Milk Report — ${model.name}`)
+                        .addFields(
+                            { name: '👤 Chatter', value: interaction.user.username, inline: true },
+                            { name: '📁 Model', value: model.name, inline: true },
+                            { name: '🧑 Subscriber', value: subscriberName, inline: true },
+                            { name: '💰 Amount Spent', value: `$${amountSpent.toFixed(2)}`, inline: true },
+                            { name: '📝 Notes', value: notesCompleted ? '✅ Yes' : '❌ No', inline: true },
+                            { name: '💆 Aftercare', value: aftercareDone ? '✅ Yes' : '❌ No', inline: true },
+                            { name: '⚠️ Issues', value: hasIssues ? issuesDescription.trim() : 'None', inline: false },
+                            { name: '🔗 Jump to Report', value: `[Click here to go to the report](${jumpUrl})` },
+                        )
+                        .setTimestamp()
+                        .setFooter({ text: `Report #${milkReport.id}` });
+                    await member.send({ embeds: [dmEmbed] });
+                } catch (e) { /* Can't DM this member */ }
             }
 
             // Confirm to the chatter
