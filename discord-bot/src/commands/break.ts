@@ -88,7 +88,11 @@ export default {
                         await prisma.breakRecord.update({ where: { id: breakRecord.id }, data: { exceeded: true } });
 
                         // Fetch ALL guild members to ensure we don't miss anyone
-                        await guild.members.fetch();
+                        try {
+                            await guild.members.fetch();
+                        } catch (e) {
+                            console.error('Failed to fetch guild members for break DM notifications:', e);
+                        }
 
                         const rolesToNotify = ['Admin', 'Manager', 'Supervisor'];
                         const notifyMembers = new Map<string, any>();
@@ -114,7 +118,9 @@ export default {
                                     )
                                     .setTimestamp();
                                 await member.send({ embeds: [alertEmbed] });
-                            } catch (e) { /* Can't DM */ }
+                            } catch (e) {
+                                console.error(`[Break DM] Failed to DM ${member.user?.tag || member.id}:`, e);
+                            }
                         }
                     }
                 } catch (e) { console.error('Break check error:', e); }

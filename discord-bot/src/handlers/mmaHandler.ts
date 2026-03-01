@@ -91,8 +91,8 @@ export default {
                 }
             }
 
-            // DM supervisors and managers
-            const rolesToNotify = ['Supervisor', 'Manager'];
+            // DM supervisors, managers, admins, founders
+            const rolesToNotify = ['Supervisor', 'Manager', 'Admin', 'Founder'];
 
             // Build jump URL from the sentMessage posted in #mass-message
             let jumpUrl: string | undefined;
@@ -109,7 +109,11 @@ export default {
             }
 
             // Fetch ALL guild members to ensure we don't miss anyone (cache is often incomplete)
-            await guild.members.fetch();
+            try {
+                await guild.members.fetch();
+            } catch (e) {
+                console.error('Failed to fetch guild members for DM notifications:', e);
+            }
 
             // Collect unique members across all roles (prevent duplicate DMs)
             const notifyMembers = new Map<string, any>();
@@ -122,6 +126,8 @@ export default {
                     }
                 }
             }
+
+            console.log(`[MMA DM] Sending DMs to ${notifyMembers.size} unique members for MMA #${mmaRequest.id}`);
 
             for (const [, member] of notifyMembers) {
                 try {
@@ -142,7 +148,9 @@ export default {
                     }
 
                     await member.send({ embeds: [dmEmbed] });
-                } catch (e) { /* Can't DM */ }
+                } catch (e) {
+                    console.error(`[MMA DM] Failed to DM ${member.user?.tag || member.id}:`, e);
+                }
             }
 
             const successEmbed = new EmbedBuilder()

@@ -190,7 +190,11 @@ export default {
             const jumpUrl = `https://discord.com/channels/${guild.id}/${(channel as TextChannel).id}/${sentMessage.id}`;
 
             // Fetch ALL guild members to ensure we don't miss anyone (cache is often incomplete)
-            await guild.members.fetch();
+            try {
+                await guild.members.fetch();
+            } catch (e) {
+                console.error('Failed to fetch guild members for milk DM notifications:', e);
+            }
 
             // Collect unique members across all roles (prevent duplicate DMs)
             const notifyMembers = new Map<string, any>();
@@ -222,7 +226,9 @@ export default {
                         .setTimestamp()
                         .setFooter({ text: `Report #${milkReport.id}` });
                     await member.send({ embeds: [dmEmbed] });
-                } catch (e) { /* Can't DM this member */ }
+                } catch (e) {
+                    console.error(`[Milk DM] Failed to DM ${member.user?.tag || member.id}:`, e);
+                }
             }
 
             // Confirm to the chatter
