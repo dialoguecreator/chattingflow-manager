@@ -16,8 +16,11 @@ export default {
             const discordUserId = interaction.user.id;
             const guild = interaction.guild!;
 
+            console.log(`[MMA] Modal submitted by ${interaction.user.username} (${discordUserId}) for model ${modelId}`);
+
             let user = await prisma.user.findUnique({ where: { discordId: discordUserId } });
             if (!user) {
+                console.log(`[MMA] Creating new user for ${interaction.user.username}`);
                 user = await prisma.user.create({
                     data: {
                         discordId: discordUserId,
@@ -34,9 +37,12 @@ export default {
 
             const model = await prisma.onlyFansModel.findUnique({ where: { id: modelId } });
             if (!model) {
+                console.error(`[MMA] Model ${modelId} not found`);
                 const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Model not found.');
                 return interaction.editReply({ embeds: [embed] });
             }
+
+            console.log(`[MMA] Creating MMA request for ${model.name} by ${user.username}`);
 
             // Create MMA request
             const mmaRequest = await prisma.massMessageRequest.create({
@@ -47,6 +53,8 @@ export default {
                     message: message,
                 },
             });
+
+            console.log(`[MMA] Created MMA request #${mmaRequest.id}`);
 
             // Find #mass-message channel in the model's category
             const category = guild.channels.cache.get(model.discordCategoryId || '');
@@ -88,7 +96,13 @@ export default {
                         where: { id: mmaRequest.id },
                         data: { discordMessageId: sentMessage.id },
                     });
+
+                    console.log(`[MMA] Posted request #${mmaRequest.id} in #mass-message (${massMessageChannel.id})`);
+                } else {
+                    console.warn(`[MMA] No #mass-message channel found in category ${category.name} (${category.id})`);
                 }
+            } else {
+                console.warn(`[MMA] Category not found for model ${model.name} (discordCategoryId: ${model.discordCategoryId})`);
             }
 
             // DM supervisors, managers, admins, founders
@@ -112,7 +126,7 @@ export default {
             try {
                 await guild.members.fetch();
             } catch (e) {
-                console.error('Failed to fetch guild members for DM notifications:', e);
+                console.error('[MMA] Failed to fetch guild members for DM notifications:', e);
             }
 
             // Collect unique members across all roles (prevent duplicate DMs)
@@ -127,7 +141,7 @@ export default {
                 }
             }
 
-            console.log(`[MMA DM] Sending DMs to ${notifyMembers.size} unique members for MMA #${mmaRequest.id}`);
+            console.log(`[MMA] Sending DMs to ${notifyMembers.size} unique members for MMA #${mmaRequest.id}`);
 
             for (const [, member] of notifyMembers) {
                 try {
@@ -158,9 +172,13 @@ export default {
                 .setDescription('✅ Your mass message idea has been submitted for approval!');
             await interaction.editReply({ embeds: [successEmbed] });
         } catch (error) {
-            console.error('MMA modal error:', error);
-            const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ An error occurred.');
-            await interaction.editReply({ embeds: [embed] });
+            console.error('[MMA] Modal handler error:', error);
+            try {
+                const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ An error occurred while submitting your mass message request. Please try again.');
+                await interaction.editReply({ embeds: [embed] });
+            } catch (e) {
+                console.error('[MMA] Failed to send error reply:', e);
+            }
         }
     },
 
