@@ -33,8 +33,25 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <aside className="sidebar">
                 <div className="sidebar-header">
                     <div className="sidebar-logo">
-                        <div className="sidebar-logo-icon">OF</div>
-                        <div className="sidebar-logo-text">MGMT CRM</div>
+                        <svg className="dialogue-logo" viewBox="0 0 220 60" width="180" height="48">
+                            <defs>
+                                <filter id="neon-glow">
+                                    <feGaussianBlur stdDeviation="2" result="blur" />
+                                    <feMerge>
+                                        <feMergeNode in="blur" />
+                                        <feMergeNode in="blur" />
+                                        <feMergeNode in="SourceGraphic" />
+                                    </feMerge>
+                                </filter>
+                            </defs>
+                            <text
+                                className="dialogue-text"
+                                x="10" y="42"
+                                filter="url(#neon-glow)"
+                            >
+                                Dialogue
+                            </text>
+                        </svg>
                     </div>
                 </div>
                 <nav className="sidebar-nav">
