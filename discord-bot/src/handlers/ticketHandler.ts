@@ -4,6 +4,7 @@ import {
     ButtonBuilder, ButtonStyle, ChannelType, TextChannel, EmbedBuilder, MessageFlags
 } from 'discord.js';
 import prisma from '../lib/prisma';
+import { getMembersWithRoles } from '../utils/memberCache';
 
 const TICKET_MODALS: Record<string, { title: string; fields: { id: string; label: string; style: TextInputStyle; placeholder: string; required: boolean }[] }> = {
     COVERAGE: {
@@ -202,24 +203,9 @@ export default {
                     }
                 }
 
-                // Fetch ALL guild members to ensure we don't miss anyone
-                try {
-                    await guild.members.fetch();
-                } catch (e) {
-                    console.error('Failed to fetch guild members for ticket DM notifications:', e);
-                }
 
                 const rolesToNotify = ['Supervisor', 'Admin', 'Manager', 'Founder'];
-                const notifyMembers = new Map<string, any>();
-                for (const roleName of rolesToNotify) {
-                    const role = guild.roles.cache.find(r => r.name === roleName);
-                    if (role) {
-                        const membersWithRole = guild.members.cache.filter(m => m.roles.cache.has(role.id));
-                        for (const [id, member] of membersWithRole) {
-                            notifyMembers.set(id, member);
-                        }
-                    }
-                }
+                const notifyMembers = await getMembersWithRoles(guild, rolesToNotify);
 
                 for (const [, member] of notifyMembers) {
                     try {

@@ -2,6 +2,7 @@ import { Client, GatewayIntentBits, Collection, Events, Partials } from 'discord
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
+import { initMemberCache } from './utils/memberCache';
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
@@ -159,5 +160,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
+// Initialize member cache (fetches on ready, refreshes every 5 min)
+initMemberCache(client);
+
+// Global error handlers to prevent crashes
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[GLOBAL] Unhandled Rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('[GLOBAL] Uncaught Exception:', error);
+});
+
+client.on('error', (error) => {
+    console.error('[DISCORD] Client error:', error);
+});
 
 console.log('🤖 Bot is starting...');

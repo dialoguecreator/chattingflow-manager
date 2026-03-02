@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, MessageFlags } from 'discord.js';
 import prisma from '../lib/prisma';
 import { canTakeBreak } from '../utils/shifts';
+import { getMembersWithRoles } from '../utils/memberCache';
 
 const BREAK_DURATION_MS = 15 * 60 * 1000;
 const MAX_BREAKS = 2;
@@ -87,24 +88,8 @@ export default {
                     if (currentBreak && !currentBreak.endTime) {
                         await prisma.breakRecord.update({ where: { id: breakRecord.id }, data: { exceeded: true } });
 
-                        // Fetch ALL guild members to ensure we don't miss anyone
-                        try {
-                            await guild.members.fetch();
-                        } catch (e) {
-                            console.error('Failed to fetch guild members for break DM notifications:', e);
-                        }
-
                         const rolesToNotify = ['Admin', 'Manager', 'Supervisor'];
-                        const notifyMembers = new Map<string, any>();
-                        for (const roleName of rolesToNotify) {
-                            const role = guild.roles.cache.find(r => r.name === roleName);
-                            if (role) {
-                                const membersWithRole = guild.members.cache.filter(m => m.roles.cache.has(role.id));
-                                for (const [id, member] of membersWithRole) {
-                                    notifyMembers.set(id, member);
-                                }
-                            }
-                        }
+                        const notifyMembers = await getMembersWithRoles(guild, rolesToNotify);
 
                         for (const [, member] of notifyMembers) {
                             try {

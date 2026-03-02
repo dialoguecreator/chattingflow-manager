@@ -5,6 +5,8 @@ import {
 } from 'discord.js';
 import prisma from '../lib/prisma';
 
+import { getMembersWithRoles } from '../utils/memberCache';
+
 export default {
     async handleModal(interaction: ModalSubmitInteraction, params: string[]) {
         const [modelId, guildDbId] = params.map(Number);
@@ -122,24 +124,8 @@ export default {
                 }
             }
 
-            // Fetch ALL guild members to ensure we don't miss anyone (cache is often incomplete)
-            try {
-                await guild.members.fetch();
-            } catch (e) {
-                console.error('[MMA] Failed to fetch guild members for DM notifications:', e);
-            }
-
-            // Collect unique members across all roles (prevent duplicate DMs)
-            const notifyMembers = new Map<string, any>();
-            for (const roleName of rolesToNotify) {
-                const role = guild.roles.cache.find(r => r.name === roleName);
-                if (role) {
-                    const membersWithRole = guild.members.cache.filter(m => m.roles.cache.has(role.id));
-                    for (const [id, member] of membersWithRole) {
-                        notifyMembers.set(id, member);
-                    }
-                }
-            }
+            // Get unique members with notification roles (uses cached members, no rate limit)
+            const notifyMembers = await getMembersWithRoles(guild, rolesToNotify);
 
             console.log(`[MMA] Sending DMs to ${notifyMembers.size} unique members for MMA #${mmaRequest.id}`);
 
