@@ -147,6 +147,7 @@ model PayoutPeriod {
   chargebacks Chargeback[]
   punishments Punishment[]
   massPPVs    MassPPV[]
+  expenses    PayoutExpense[]
 }
 
 // ─── Payout Entries ───────────────────────────────────────
@@ -173,6 +174,17 @@ model PayoutEntry {
   user                  User         @relation(fields: [userId], references: [id])
 
   @@unique([payoutPeriodId, userId])
+}
+
+// ─── Payout Expenses ─────────────────────────────────────
+model PayoutExpense {
+  id              Int      @id @default(autoincrement())
+  payoutPeriodId  Int
+  description     String
+  amount          Float
+  createdAt       DateTime @default(now())
+
+  payoutPeriod    PayoutPeriod @relation(fields: [payoutPeriodId], references: [id])
 }
 
 // ─── Punishments ──────────────────────────────────────────

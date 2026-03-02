@@ -17,6 +17,9 @@ export default function ModelsPage() {
     const [confirmDelete, setConfirmDelete] = useState<any | null>(null);
     const [confirmArchive, setConfirmArchive] = useState<any | null>(null);
     const [showArchived, setShowArchived] = useState(false);
+    const [showAddModel, setShowAddModel] = useState(false);
+    const [newModelName, setNewModelName] = useState('');
+    const [addError, setAddError] = useState('');
 
     const userRole = (session?.user as any)?.role || '';
 
@@ -96,6 +99,23 @@ export default function ModelsPage() {
         loadData();
     };
 
+    const addModel = async () => {
+        setAddError('');
+        if (!newModelName.trim()) { setAddError('Name is required'); return; }
+        try {
+            const res = await fetch('/api/models', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newModelName.trim() }),
+            });
+            const data = await res.json();
+            if (!res.ok) { setAddError(data.error || 'Failed'); return; }
+            setShowAddModel(false);
+            setNewModelName('');
+            loadData();
+        } catch { setAddError('Network error'); }
+    };
+
     if (userRole !== 'ADMIN') return null;
 
     const activeModels = models.filter(m => m.status === 'ACTIVE');
@@ -107,6 +127,7 @@ export default function ModelsPage() {
                 <h1 className="page-title">Models & Commission</h1>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <span className="text-sm text-muted">{activeModels.length} active</span>
+                    <button className="btn btn-primary btn-sm" onClick={() => { setShowAddModel(true); setAddError(''); setNewModelName(''); }}>+ Add Model</button>
                     {archivedModels.length > 0 && (
                         <button className="btn btn-sm btn-secondary" onClick={() => setShowArchived(!showArchived)}>
                             {showArchived ? 'Hide' : 'Show'} Archived ({archivedModels.length})
@@ -312,6 +333,32 @@ export default function ModelsPage() {
                     </div>
                 )}
             </div>
+
+            {/* Add Model Modal */}
+            {showAddModel && (
+                <div className="modal-overlay" onClick={() => setShowAddModel(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+                        <h3 className="modal-title">➕ Add Model</h3>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: '0 0 16px' }}>
+                            Create a model manually. This will not create Discord channels.
+                        </p>
+                        {addError && (
+                            <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, color: 'var(--danger)', fontSize: 13 }}>
+                                {addError}
+                            </div>
+                        )}
+                        <div className="form-group">
+                            <label className="form-label">Model Name</label>
+                            <input className="form-input" value={newModelName} onChange={e => setNewModelName(e.target.value)} placeholder="e.g. Luna" autoFocus
+                                onKeyDown={e => { if (e.key === 'Enter') addModel(); }} />
+                        </div>
+                        <div className="modal-actions">
+                            <button className="btn btn-secondary" onClick={() => setShowAddModel(false)}>Cancel</button>
+                            <button className="btn btn-primary" onClick={addModel}>➕ Create Model</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

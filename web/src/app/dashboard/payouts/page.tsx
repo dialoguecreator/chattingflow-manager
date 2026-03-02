@@ -12,6 +12,12 @@ function fmtDate(ts: number | string) {
         ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
+function fmtShort(ts: string) {
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+        ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
 export default function PayoutsPage() {
     const { data: session, status } = useSession();
     const router = useRouter();
@@ -24,6 +30,19 @@ export default function PayoutsPage() {
     const [showCreatePeriod, setShowCreatePeriod] = useState(false);
     const [periodForm, setPeriodForm] = useState({ startDate: '', endDate: '' });
 
+    // Expandable rows
+    const [expandedEntry, setExpandedEntry] = useState<number | null>(null);
+    const [entryInvoices, setEntryInvoices] = useState<any[]>([]);
+    const [loadingInvoices, setLoadingInvoices] = useState(false);
+
+    // Editable bonus
+    const [editingBonus, setEditingBonus] = useState<number | null>(null);
+    const [bonusValue, setBonusValue] = useState('');
+
+    // Expenses
+    const [expenses, setExpenses] = useState<any[]>([]);
+    const [expenseForm, setExpenseForm] = useState({ description: '', amount: '' });
+
     const userRole = (session?.user as any)?.role || '';
     const isAdminOrManager = userRole === 'ADMIN' || userRole === 'MANAGER';
 
@@ -31,7 +50,6 @@ export default function PayoutsPage() {
         if (status === 'unauthenticated') router.push('/login');
         if (status === 'authenticated' && !isAdminOrManager) router.push('/dashboard');
     }, [status, isAdminOrManager, router]);
-
 
     const loadPeriods = () => {
         fetch('/api/payouts')
@@ -45,12 +63,16 @@ export default function PayoutsPage() {
     const openPeriod = async (period: any) => {
         setSelectedPeriod(period);
         setLoadingEntries(true);
-        // First recalculate
+        setExpandedEntry(null);
         await fetch(`/api/payouts/${period.id}/calculate`, { method: 'POST' });
-        // Then fetch entries
-        const res = await fetch(`/api/payouts/${period.id}/entries`);
-        const data = await res.json();
-        setEntries(data.entries || []);
+        const [entriesRes, expensesRes] = await Promise.all([
+            fetch(`/api/payouts/${period.id}/entries`),
+            fetch(`/api/payouts/${period.id}/expenses`),
+        ]);
+        const entriesData = await entriesRes.json();
+        const expensesData = await expensesRes.json();
+        setEntries(entriesData.entries || []);
+        setExpenses(expensesData.expenses || []);
         setLoadingEntries(false);
     };
 
@@ -64,15 +86,73 @@ export default function PayoutsPage() {
         setRecalculating(false);
     };
 
+    // Expand chatter row to show invoices
+    const toggleExpand = async (entryId: number) => {
+        if (expandedEntry === entryId) {
+            setExpandedEntry(null);
+            setEntryInvoices([]);
+            return;
+        }
+        setExpandedEntry(entryId);
+        setLoadingInvoices(true);
+        try {
+            const res = await fetch(`/api/payouts/${selectedPeriod.id}/entries/${entryId}/invoices`);
+            const data = await res.json();
+            setEntryInvoices(data.invoices || []);
+        } catch { setEntryInvoices([]); }
+        setLoadingInvoices(false);
+    };
+
+    // Save bonus
+    const saveBonus = async (entryId: number) => {
+        const res = await fetch(`/api/payouts/${selectedPeriod.id}/entries`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entryId, bonus: parseFloat(bonusValue) || 0 }),
+        });
+        const data = await res.json();
+        if (res.ok && data.entry) {
+            setEntries(prev => prev.map(e => e.id === entryId ? { ...e, ...data.entry } : e));
+        }
+        setEditingBonus(null);
+    };
+
+    // Add expense
+    const addExpense = async () => {
+        if (!expenseForm.description.trim() || !expenseForm.amount) return;
+        const res = await fetch(`/api/payouts/${selectedPeriod.id}/expenses`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ description: expenseForm.description, amount: parseFloat(expenseForm.amount) }),
+        });
+        if (res.ok) {
+            const data = await res.json();
+            setExpenses(prev => [data.expense, ...prev]);
+            setExpenseForm({ description: '', amount: '' });
+        }
+    };
+
+    // Delete expense
+    const deleteExpense = async (expenseId: number) => {
+        await fetch(`/api/payouts/${selectedPeriod.id}/expenses?expenseId=${expenseId}`, { method: 'DELETE' });
+        setExpenses(prev => prev.filter(e => e.id !== expenseId));
+    };
+
+    // Totals
     const totalNetPayout = entries.reduce((s, e) => s + (e.netPayout || 0), 0);
     const totalGross = entries.reduce((s, e) => s + (e.totalGross || 0), 0);
+    const totalChargebacks = entries.reduce((s, e) => s + (e.chargebackDeductions || 0), 0);
+    const totalPunishments = entries.reduce((s, e) => s + (e.punishmentDeductions || 0), 0);
+    const totalFees = entries.reduce((s, e) => s + (e.feeAmount || 0), 0);
+    const totalBonuses = entries.reduce((s, e) => s + (e.bonus || e.massPPVEarnings || 0), 0);
+    const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
 
     return (
         <>
             <header className="main-header">
                 <h1 className="page-title">Payouts</h1>
                 {selectedPeriod && (
-                    <button className="btn btn-secondary btn-sm" onClick={() => setSelectedPeriod(null)}>
+                    <button className="btn btn-secondary btn-sm" onClick={() => { setSelectedPeriod(null); setExpandedEntry(null); }}>
                         ← Back to Periods
                     </button>
                 )}
@@ -162,6 +242,7 @@ export default function PayoutsPage() {
                 ) : (
                     /* ─── Period Detail View ─── */
                     <>
+                        {/* Stats */}
                         <div className="stats-grid">
                             <div className="stat-card">
                                 <div className="stat-label">Period</div>
@@ -186,6 +267,33 @@ export default function PayoutsPage() {
                             </div>
                         </div>
 
+                        {/* Totals Summary */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, margin: '16px 0' }}>
+                            <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 'var(--radius-md)', padding: '12px 16px' }}>
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>TOTAL CHARGEBACKS</div>
+                                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--danger)' }}>-${fmt(totalChargebacks)}</div>
+                            </div>
+                            <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 'var(--radius-md)', padding: '12px 16px' }}>
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>TOTAL PUNISHMENTS</div>
+                                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--danger)' }}>-${fmt(totalPunishments)}</div>
+                            </div>
+                            <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 'var(--radius-md)', padding: '12px 16px' }}>
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>TOTAL FEES (5%)</div>
+                                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--warning)' }}>-${fmt(totalFees)}</div>
+                            </div>
+                            <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 'var(--radius-md)', padding: '12px 16px' }}>
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>TOTAL BONUSES</div>
+                                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--success)' }}>+${fmt(totalBonuses)}</div>
+                            </div>
+                            {totalExpenses > 0 && (
+                                <div style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 'var(--radius-md)', padding: '12px 16px' }}>
+                                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>TOTAL EXPENSES</div>
+                                    <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent-primary)' }}>-${fmt(totalExpenses)}</div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Breakdown Table */}
                         <div className="card">
                             <div className="card-header">
                                 <h3 className="card-title">Period #{selectedPeriod.id} — Breakdown</h3>
@@ -223,13 +331,14 @@ export default function PayoutsPage() {
                                                 const rate = e.commissionRate || 4;
                                                 const commission = (totalSales - cb) * (rate / 100);
                                                 const pun = e.punishmentDeductions || 0;
-                                                const bonus = e.massPPVEarnings || 0;
+                                                const bonus = e.bonus || e.massPPVEarnings || 0;
                                                 const beforeFee = commission - pun + bonus;
                                                 const fee = beforeFee > 0 ? beforeFee * 0.05 : 0;
                                                 const payout = beforeFee - fee + (e.staffSalary || 0);
 
                                                 const isStaff = e.user?.role && e.user.role !== 'CHATTER';
                                                 const isPaid = e.paid;
+                                                const isExpanded = expandedEntry === e.id;
                                                 const rowStyle: any = {};
                                                 if (isPaid) {
                                                     rowStyle.textDecoration = 'line-through';
@@ -239,50 +348,130 @@ export default function PayoutsPage() {
                                                 const nameColor = isStaff ? '#f97316' : 'var(--text-primary)';
 
                                                 return (
-                                                    <tr key={e.id} style={rowStyle}>
-                                                        <td>
-                                                            <button
-                                                                className="btn btn-sm"
-                                                                style={{
-                                                                    background: 'transparent',
-                                                                    border: 'none',
-                                                                    fontSize: 18,
-                                                                    cursor: 'pointer',
-                                                                    padding: '2px 6px',
+                                                    <>{/* Fragment for row + expanded */}
+                                                        <tr
+                                                            key={e.id}
+                                                            style={{ ...rowStyle, cursor: 'pointer', transition: 'background 150ms' }}
+                                                            onClick={() => toggleExpand(e.id)}
+                                                            onMouseEnter={ev => (ev.currentTarget.style.background = 'rgba(139,92,246,0.05)')}
+                                                            onMouseLeave={ev => (ev.currentTarget.style.background = 'transparent')}
+                                                        >
+                                                            <td>
+                                                                <button
+                                                                    className="btn btn-sm"
+                                                                    style={{
+                                                                        background: 'transparent',
+                                                                        border: 'none',
+                                                                        fontSize: 18,
+                                                                        cursor: 'pointer',
+                                                                        padding: '2px 6px',
+                                                                    }}
+                                                                    onClick={async (ev) => {
+                                                                        ev.stopPropagation();
+                                                                        await fetch(`/api/payouts/${selectedPeriod.id}/entries`, {
+                                                                            method: 'PATCH',
+                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                            body: JSON.stringify({ entryId: e.id, paid: !isPaid }),
+                                                                        });
+                                                                        setEntries(prev => prev.map(en => en.id === e.id ? { ...en, paid: !isPaid } : en));
+                                                                    }}
+                                                                    title={isPaid ? 'Mark as unpaid' : 'Mark as paid'}
+                                                                >
+                                                                    {isPaid ? '✅' : '⬜'}
+                                                                </button>
+                                                            </td>
+                                                            <td style={{ fontWeight: 600, color: nameColor }}>
+                                                                <span style={{ marginRight: 6 }}>{isExpanded ? '▼' : '▶'}</span>
+                                                                {e.user?.firstName} {e.user?.lastName}
+                                                                {isStaff && (
+                                                                    <span style={{ fontSize: 11, marginLeft: 6, color: '#f97316', opacity: 0.8 }}>
+                                                                        ({e.user?.staffProfile?.position || e.user?.role})
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td style={{ fontWeight: 600 }}>${fmt(totalSales)}</td>
+                                                            <td style={{ color: 'var(--danger)' }}>-${fmt(cb)}</td>
+                                                            <td>{parseFloat(rate.toFixed(2))}%</td>
+                                                            <td style={{ color: 'var(--success)', fontWeight: 600 }}>${fmt(commission)}</td>
+                                                            <td style={{ color: 'var(--danger)' }}>-${fmt(pun)}</td>
+                                                            <td
+                                                                style={{ color: 'var(--success)', cursor: 'pointer' }}
+                                                                onClick={(ev) => {
+                                                                    ev.stopPropagation();
+                                                                    setEditingBonus(e.id);
+                                                                    setBonusValue(bonus.toString());
                                                                 }}
-                                                                onClick={async () => {
-                                                                    await fetch(`/api/payouts/${selectedPeriod.id}/entries`, {
-                                                                        method: 'PATCH',
-                                                                        headers: { 'Content-Type': 'application/json' },
-                                                                        body: JSON.stringify({ entryId: e.id, paid: !isPaid }),
-                                                                    });
-                                                                    // Update locally
-                                                                    setEntries(prev => prev.map(en => en.id === e.id ? { ...en, paid: !isPaid } : en));
-                                                                }}
-                                                                title={isPaid ? 'Mark as unpaid' : 'Mark as paid'}
                                                             >
-                                                                {isPaid ? '✅' : '⬜'}
-                                                            </button>
-                                                        </td>
-                                                        <td style={{ fontWeight: 600, color: nameColor }}>
-                                                            {e.user?.firstName} {e.user?.lastName}
-                                                            {isStaff && (
-                                                                <span style={{ fontSize: 11, marginLeft: 6, color: '#f97316', opacity: 0.8 }}>
-                                                                    ({e.user?.staffProfile?.position || e.user?.role})
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td style={{ fontWeight: 600 }}>${fmt(totalSales)}</td>
-                                                        <td style={{ color: 'var(--danger)' }}>-${fmt(cb)}</td>
-                                                        <td>{parseFloat(rate.toFixed(2))}%</td>
-                                                        <td style={{ color: 'var(--success)', fontWeight: 600 }}>${fmt(commission)}</td>
-                                                        <td style={{ color: 'var(--danger)' }}>-${fmt(pun)}</td>
-                                                        <td style={{ color: 'var(--success)' }}>+${fmt(bonus)}</td>
-                                                        <td style={{ color: 'var(--warning)' }}>-${fmt(fee)}</td>
-                                                        <td style={{ color: 'var(--accent-primary)', fontWeight: 700, fontSize: 15 }}>
-                                                            ${fmt(payout)}
-                                                        </td>
-                                                    </tr>
+                                                                {editingBonus === e.id ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        value={bonusValue}
+                                                                        onChange={ev => setBonusValue(ev.target.value)}
+                                                                        onBlur={() => saveBonus(e.id)}
+                                                                        onKeyDown={ev => { if (ev.key === 'Enter') saveBonus(e.id); if (ev.key === 'Escape') setEditingBonus(null); }}
+                                                                        onClick={ev => ev.stopPropagation()}
+                                                                        autoFocus
+                                                                        style={{
+                                                                            width: 80, padding: '2px 6px', fontSize: 13,
+                                                                            background: 'var(--bg-secondary)', border: '1px solid var(--accent-primary)',
+                                                                            borderRadius: 4, color: 'var(--text-primary)',
+                                                                        }}
+                                                                    />
+                                                                ) : (
+                                                                    <span title="Click to edit bonus">+${fmt(bonus)}</span>
+                                                                )}
+                                                            </td>
+                                                            <td style={{ color: 'var(--warning)' }}>-${fmt(fee)}</td>
+                                                            <td style={{ color: 'var(--accent-primary)', fontWeight: 700, fontSize: 15 }}>
+                                                                ${fmt(payout)}
+                                                            </td>
+                                                        </tr>
+                                                        {/* Expanded invoices row */}
+                                                        {isExpanded && (
+                                                            <tr key={`${e.id}-detail`}>
+                                                                <td colSpan={10} style={{ padding: 0, background: 'rgba(139,92,246,0.03)' }}>
+                                                                    <div style={{ padding: '12px 24px 16px 52px' }}>
+                                                                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                                                                            📋 Shifts / Invoices for {e.user?.firstName} {e.user?.lastName}
+                                                                        </div>
+                                                                        {loadingInvoices ? (
+                                                                            <p className="text-muted" style={{ fontSize: 13 }}>Loading invoices...</p>
+                                                                        ) : entryInvoices.length > 0 ? (
+                                                                            <table style={{ width: '100%', fontSize: 13 }}>
+                                                                                <thead>
+                                                                                    <tr>
+                                                                                        <th style={{ fontSize: 11, padding: '4px 8px' }}>Model</th>
+                                                                                        <th style={{ fontSize: 11, padding: '4px 8px' }}>Clock In</th>
+                                                                                        <th style={{ fontSize: 11, padding: '4px 8px' }}>Clock Out</th>
+                                                                                        <th style={{ fontSize: 11, padding: '4px 8px' }}>Total Gross</th>
+                                                                                        <th style={{ fontSize: 11, padding: '4px 8px' }}>Split</th>
+                                                                                        <th style={{ fontSize: 11, padding: '4px 8px' }}>Amount</th>
+                                                                                    </tr>
+                                                                                </thead>
+                                                                                <tbody>
+                                                                                    {entryInvoices.map((inv: any) => (
+                                                                                        <tr key={inv.id} style={{ borderBottom: '1px solid var(--border-primary)' }}>
+                                                                                            <td style={{ padding: '4px 8px' }}>
+                                                                                                <span className="badge badge-primary" style={{ fontSize: 11 }}>{inv.model?.name || '—'}</span>
+                                                                                            </td>
+                                                                                            <td style={{ padding: '4px 8px', color: 'var(--text-secondary)' }}>{inv.clockRecord?.clockIn ? fmtShort(inv.clockRecord.clockIn) : '—'}</td>
+                                                                                            <td style={{ padding: '4px 8px', color: 'var(--text-secondary)' }}>{inv.clockRecord?.clockOut ? fmtShort(inv.clockRecord.clockOut) : '—'}</td>
+                                                                                            <td style={{ padding: '4px 8px' }}>${fmt(inv.totalGross)}</td>
+                                                                                            <td style={{ padding: '4px 8px', color: 'var(--text-muted)' }}>{inv.splitCount > 1 ? `${inv.splitCount}-way` : '—'}</td>
+                                                                                            <td style={{ padding: '4px 8px', fontWeight: 600, color: 'var(--success)' }}>${fmt(inv.splitAmount)}</td>
+                                                                                        </tr>
+                                                                                    ))}
+                                                                                </tbody>
+                                                                            </table>
+                                                                        ) : (
+                                                                            <p className="text-muted" style={{ fontSize: 13 }}>No invoices found for this chatter in this period.</p>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </>
                                                 );
                                             })}
                                         </tbody>
@@ -293,6 +482,91 @@ export default function PayoutsPage() {
                                     <div className="empty-state-icon">📊</div>
                                     <div className="empty-state-text">No entries for this period. Click Recalculate to generate payouts from invoices.</div>
                                 </div>
+                            )}
+                        </div>
+
+                        {/* Additional Expenses */}
+                        <div className="card" style={{ marginTop: 16 }}>
+                            <div className="card-header">
+                                <h3 className="card-title">💰 Additional Expenses</h3>
+                            </div>
+                            <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '0 0 12px' }}>
+                                Track operational costs: office rent, electricity, subscriptions, etc.
+                            </p>
+
+                            {/* Add expense form */}
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'flex-end' }}>
+                                <div style={{ flex: 1 }}>
+                                    <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Description</label>
+                                    <input
+                                        className="form-input"
+                                        value={expenseForm.description}
+                                        onChange={e => setExpenseForm({ ...expenseForm, description: e.target.value })}
+                                        placeholder="e.g. Office rent"
+                                        style={{ fontSize: 13 }}
+                                    />
+                                </div>
+                                <div style={{ width: 120 }}>
+                                    <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Amount ($)</label>
+                                    <input
+                                        className="form-input"
+                                        type="number"
+                                        step="0.01"
+                                        value={expenseForm.amount}
+                                        onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+                                        placeholder="0.00"
+                                        style={{ fontSize: 13 }}
+                                    />
+                                </div>
+                                <button
+                                    className="btn btn-primary btn-sm"
+                                    onClick={addExpense}
+                                    disabled={!expenseForm.description.trim() || !expenseForm.amount}
+                                    style={{ height: 38 }}
+                                >
+                                    + Add
+                                </button>
+                            </div>
+
+                            {expenses.length > 0 ? (
+                                <div className="table-container">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Description</th>
+                                                <th>Amount</th>
+                                                <th>Date</th>
+                                                <th style={{ width: 60 }}></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {expenses.map((exp: any) => (
+                                                <tr key={exp.id}>
+                                                    <td style={{ fontWeight: 500 }}>{exp.description}</td>
+                                                    <td style={{ color: 'var(--danger)', fontWeight: 600 }}>-${fmt(exp.amount)}</td>
+                                                    <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{fmtShort(exp.createdAt)}</td>
+                                                    <td>
+                                                        <button
+                                                            className="btn btn-sm btn-danger"
+                                                            onClick={() => deleteExpense(exp.id)}
+                                                            style={{ padding: '2px 8px', fontSize: 12 }}
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            <tr style={{ borderTop: '2px solid var(--border-primary)' }}>
+                                                <td style={{ fontWeight: 700 }}>TOTAL EXPENSES</td>
+                                                <td style={{ fontWeight: 700, color: 'var(--danger)' }}>-${fmt(totalExpenses)}</td>
+                                                <td></td>
+                                                <td></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <p className="text-muted" style={{ fontSize: 13 }}>No expenses added for this period.</p>
                             )}
                         </div>
                     </>

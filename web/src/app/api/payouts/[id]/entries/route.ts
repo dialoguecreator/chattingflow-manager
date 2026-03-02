@@ -30,11 +30,37 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const body = await req.json();
 
     try {
-        const entry = await prisma.payoutEntry.update({
-            where: { id: parseInt(body.entryId) },
-            data: { paid: body.paid },
-        });
-        return NextResponse.json({ entry });
+        const entryId = parseInt(body.entryId);
+
+        // If updating paid status only
+        if (body.paid !== undefined && body.bonus === undefined) {
+            const entry = await prisma.payoutEntry.update({
+                where: { id: entryId },
+                data: { paid: body.paid },
+            });
+            return NextResponse.json({ entry });
+        }
+
+        // If updating bonus — recalculate netPayout
+        if (body.bonus !== undefined) {
+            const existing = await prisma.payoutEntry.findUnique({ where: { id: entryId } });
+            if (!existing) return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
+
+            const bonus = parseFloat(body.bonus) || 0;
+            const afterChargebacks = existing.totalGross - existing.chargebackDeductions;
+            const commissionEarnings = afterChargebacks * (existing.commissionRate / 100);
+            const beforeFee = commissionEarnings - existing.punishmentDeductions + bonus;
+            const feeAmount = beforeFee > 0 ? beforeFee * (existing.feePercent / 100) : 0;
+            const netPayout = (beforeFee - feeAmount) + existing.staffSalary;
+
+            const entry = await prisma.payoutEntry.update({
+                where: { id: entryId },
+                data: { bonus, massPPVEarnings: bonus, feeAmount, netPayout },
+            });
+            return NextResponse.json({ entry });
+        }
+
+        return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
     } catch (error) {
         return NextResponse.json({ error: 'Failed' }, { status: 500 });
     }
