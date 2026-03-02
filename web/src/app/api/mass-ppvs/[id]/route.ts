@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireRole } from '@/lib/apiAuth';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+    const auth = await requireRole('ADMIN', 'MANAGER');
+    if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
+
     const { id } = await params;
     try {
         const { price, buyerCount, description } = await req.json();
@@ -28,6 +32,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+    const auth = await requireRole('ADMIN', 'MANAGER');
+    if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
+
     const { id } = await params;
     try {
         await prisma.massPPV.delete({ where: { id: parseInt(id) } });

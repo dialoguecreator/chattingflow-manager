@@ -1,7 +1,11 @@
 import { NextResponse, NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireRole } from '@/lib/apiAuth';
 
 export async function GET() {
+    const auth = await requireRole('ADMIN', 'MANAGER');
+    if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
+
     try {
         const chatters = await prisma.user.findMany({
             where: { role: 'CHATTER' },
@@ -19,6 +23,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+    const auth = await requireRole('ADMIN', 'MANAGER');
+    if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
+
     try {
         const { discordUsername, discordId, displayName } = await req.json();
 

@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireRole } from '@/lib/apiAuth';
 
 export async function GET() {
+    const auth = await requireRole('ADMIN', 'MANAGER');
+    if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
+
     try {
         const massPPVs = await prisma.massPPV.findMany({
             include: {
@@ -15,6 +19,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+    const auth = await requireRole('ADMIN', 'MANAGER');
+    if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
+
     try {
         const { sentById, modelId, price, buyerCount, description } = await req.json();
         const priceNum = parseFloat(price);

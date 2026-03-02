@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireRole } from '@/lib/apiAuth';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+    const auth = await requireRole('ADMIN', 'MANAGER');
+    if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
     const { id } = await params;
     const userId = parseInt(id);
     const body = await req.json();
@@ -24,6 +27,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
 // Archive chatter (mark as FIRED) instead of deleting
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+    const auth = await requireRole('ADMIN', 'MANAGER');
+    if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
     const { id } = await params;
     const userId = parseInt(id);
 

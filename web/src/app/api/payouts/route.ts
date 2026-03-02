@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireRole } from '@/lib/apiAuth';
 
 export async function GET() {
+    const auth = await requireRole('ADMIN', 'MANAGER');
+    if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
+
     try {
         const periods = await prisma.payoutPeriod.findMany({
             include: {
@@ -30,6 +34,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+    const auth = await requireRole('ADMIN', 'MANAGER');
+    if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
+
     try {
         const body = await req.json().catch(() => null);
 
