@@ -83,6 +83,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             const punishmentDeductions = punByUser[userId] || 0;
             const massPPVEarnings = ppvByUser[userId] || 0; // bonus
             const salary = staffByUser[userId] || 0;
+            const feePercent = 5.0;
+
+            // Check if entry already exists (to preserve manually-set bonus)
+            const existing = await prisma.payoutEntry.findUnique({
+                where: { payoutPeriodId_userId: { payoutPeriodId: periodId, userId } },
+            });
+
+            // Preserve manually-set bonus if it exists, otherwise use massPPVEarnings
+            const bonus = existing ? existing.bonus : massPPVEarnings;
 
             // Step 1: Total Sales - Chargebacks
             const afterChargebacks = totalGross - chargebackDeductions;
@@ -91,10 +100,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             const commissionEarnings = afterChargebacks * (commissionRate / 100);
 
             // Step 3: - punishment + bonus
-            const beforeFee = commissionEarnings - punishmentDeductions + massPPVEarnings;
+            const beforeFee = commissionEarnings - punishmentDeductions + bonus;
 
             // Step 4: - 5% fee
-            const feePercent = 5.0;
             const feeAmount = beforeFee > 0 ? beforeFee * (feePercent / 100) : 0;
 
             // Final payout + staff salary
@@ -105,7 +113,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                 update: {
                     totalGross, commissionRate, commissionEarnings,
                     chargebackDeductions, punishmentDeductions, massPPVEarnings,
-                    bonus: massPPVEarnings, feePercent, feeAmount,
+                    bonus, feePercent, feeAmount,
                     staffSalary: salary, netPayout,
                 },
                 create: {
