@@ -344,3 +344,10 @@ model MilkReport {
   model    OnlyFansModel @relation(fields: [modelId], references: [id])
   guild    Guild         @relation(fields: [guildId], references: [id])
 }
+
+// ─── Settings ─────────────────────────────────────────────
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

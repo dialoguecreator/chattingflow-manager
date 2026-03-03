@@ -62,9 +62,34 @@ export async function GET(req: Request) {
     }
 }
 
+/**
+ * Parse a datetime-local string (e.g. "2026-02-18T11:00") in a given timezone.
+ * Returns a Date object representing that moment in UTC.
+ */
+function parseDateInTimezone(dateStr: string, tz: string): Date {
+    // datetime-local gives us "YYYY-MM-DDTHH:mm" — we treat it as local to the configured tz
+    // Create a date formatter that can tell us the offset for this timezone
+    const d = new Date(dateStr); // parse as UTC first
+    // Get what the time would be in the target timezone
+    const utcStr = d.toLocaleString('en-US', { timeZone: 'UTC' });
+    const tzStr = d.toLocaleString('en-US', { timeZone: tz });
+    const utcDate = new Date(utcStr);
+    const tzDate = new Date(tzStr);
+    const offsetMs = tzDate.getTime() - utcDate.getTime();
+    // Subtract the offset to convert "local tz" input to UTC
+    return new Date(d.getTime() - offsetMs);
+}
+
 export async function POST(req: Request) {
     try {
         const { userId, userId2, modelId, clockIn, clockOut, totalGross, splitCount, shiftSummary } = await req.json();
+
+        // Fetch configured timezone
+        const tzSetting = await prisma.setting.findUnique({ where: { key: 'timezone' } });
+        const tz = tzSetting?.value || 'UTC';
+
+        const clockInDate = parseDateInTimezone(clockIn, tz);
+        const clockOutDate = parseDateInTimezone(clockOut, tz);
 
         const hasPartner = userId2 && userId2.trim() && userId2 !== userId;
         const splits = hasPartner ? 2 : (parseInt(splitCount) || 1);
@@ -85,8 +110,8 @@ export async function POST(req: Request) {
                 modelId: parseInt(modelId),
                 guildId: model.guildId,
                 discordUserId: user.discordId || `manual_${user.id}`,
-                clockIn: new Date(clockIn),
-                clockOut: new Date(clockOut),
+                clockIn: clockInDate,
+                clockOut: clockOutDate,
                 status: 'COMPLETED',
             },
         });
@@ -116,8 +141,8 @@ export async function POST(req: Request) {
                     modelId: parseInt(modelId),
                     guildId: model.guildId,
                     discordUserId: user2.discordId || `manual_${user2.id}`,
-                    clockIn: new Date(clockIn),
-                    clockOut: new Date(clockOut),
+                    clockIn: clockInDate,
+                    clockOut: clockOutDate,
                     status: 'COMPLETED',
                 },
             });

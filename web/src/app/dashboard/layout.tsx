@@ -19,6 +19,7 @@ const navItems = [
     { label: 'Staff', href: '/dashboard/staff', icon: '👥' },
     { label: 'Punishments', href: '/dashboard/punishments', icon: '⚖️' },
     { section: 'Settings' },
+    { label: 'Settings', href: '/dashboard/settings', icon: '⚙️', adminOnly: true },
     { label: 'Invite Member', href: '/dashboard/invite', icon: '🔗', adminOnly: true },
 ];
 
