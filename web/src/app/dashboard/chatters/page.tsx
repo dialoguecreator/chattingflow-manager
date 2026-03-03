@@ -39,9 +39,18 @@ export default function ChattersPage() {
     };
 
     const archiveChatter = async (userId: number) => {
-        await fetch(`/api/chatters/${userId}`, { method: 'DELETE' });
-        setConfirmArchive(null);
-        loadChatters();
+        try {
+            const res = await fetch(`/api/chatters/${userId}`, { method: 'DELETE' });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                alert(data.error || `Failed to fire chatter (${res.status})`);
+                return;
+            }
+            setConfirmArchive(null);
+            loadChatters();
+        } catch (err) {
+            alert('Network error — could not fire chatter.');
+        }
     };
 
     const reactivateChatter = async (userId: number) => {
