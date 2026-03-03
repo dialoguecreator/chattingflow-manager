@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
-type Role = 'ADMIN' | 'MANAGER' | 'SUPERVISOR' | 'CHATTER';
+type Role = 'FOUNDER' | 'ADMIN' | 'MANAGER' | 'FINANCE_MANAGER' | 'SUPERVISOR' | 'CHATTER' | 'MASS_PPV_ENGINEER';
 
 /**
  * Check if the current user has one of the allowed roles.

@@ -6,7 +6,7 @@ export async function PUT(
     req: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const auth = await requireRole('ADMIN', 'MANAGER');
+    const auth = await requireRole('FOUNDER', 'ADMIN', 'MANAGER');
     if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
 
     const { id } = await params;
@@ -36,7 +36,7 @@ export async function DELETE(
     req: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const auth = await requireRole('ADMIN', 'MANAGER');
+    const auth = await requireRole('FOUNDER', 'ADMIN', 'MANAGER');
     if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
 
     const { id } = await params;

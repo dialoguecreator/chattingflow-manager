@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { requireRole } from '@/lib/apiAuth';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-    const auth = await requireRole('ADMIN', 'MANAGER');
+    const auth = await requireRole('FOUNDER', 'ADMIN', 'MANAGER');
     if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
 
     const { id } = await params;

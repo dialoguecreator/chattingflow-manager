@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { requireRole } from '@/lib/apiAuth';
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-    const auth = await requireRole('ADMIN', 'MANAGER');
+    const auth = await requireRole('FOUNDER', 'ADMIN', 'MANAGER');
     if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
 
     const { id } = await params;
@@ -21,7 +21,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-    const auth = await requireRole('ADMIN', 'MANAGER');
+    const auth = await requireRole('FOUNDER', 'ADMIN', 'MANAGER');
     if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
 
     const { id } = await params;
@@ -52,7 +52,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 }
 
 export async function DELETE(req: Request) {
-    const auth = await requireRole('ADMIN', 'MANAGER');
+    const auth = await requireRole('FOUNDER', 'ADMIN', 'MANAGER');
     if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
 
     try {

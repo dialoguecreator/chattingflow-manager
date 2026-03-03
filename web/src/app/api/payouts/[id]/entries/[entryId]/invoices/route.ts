@@ -6,7 +6,7 @@ export async function GET(
     req: Request,
     { params }: { params: Promise<{ id: string; entryId: string }> }
 ) {
-    const auth = await requireRole('ADMIN', 'MANAGER');
+    const auth = await requireRole('FOUNDER', 'ADMIN', 'MANAGER');
     if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
 
     const { id, entryId } = await params;

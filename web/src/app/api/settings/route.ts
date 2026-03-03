@@ -14,7 +14,7 @@ export async function GET() {
 }
 
 export async function PATCH(req: Request) {
-    const auth = await requireRole('ADMIN', 'MANAGER');
+    const auth = await requireRole('FOUNDER', 'ADMIN', 'MANAGER');
     if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
 
     try {
