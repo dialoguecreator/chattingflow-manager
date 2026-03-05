@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { requireRole } from '@/lib/apiAuth';
 
 export async function GET() {
-    const auth = await requireRole('FOUNDER', 'ADMIN', 'MANAGER');
+    const auth = await requireRole('FOUNDER', 'ADMIN', 'MANAGER', 'SUPERVISOR');
     if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
 
     try {
