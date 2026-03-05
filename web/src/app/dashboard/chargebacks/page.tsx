@@ -100,17 +100,26 @@ export default function ChargebacksPage() {
     useEffect(() => { if (status === 'unauthenticated') router.push('/login'); }, [status, router]);
     useEffect(() => { loadData(); }, []);
 
-    const loadData = () => {
-        Promise.all([
-            fetch('/api/chargebacks').then(r => r.json()),
-            fetch('/api/chatters').then(r => r.json()),
-            fetch('/api/models').then(r => r.json()),
-        ]).then(([cbData, cData, mData]) => {
+    const loadData = async () => {
+        try {
+            const [cbRes, cRes, mRes] = await Promise.all([
+                fetch('/api/chargebacks'),
+                fetch('/api/chatters'),
+                fetch('/api/models'),
+            ]);
+
+            const cbData = cbRes.ok ? await cbRes.json() : (console.error('Chargebacks API error:', cbRes.status), { chargebacks: [] });
+            const cData = cRes.ok ? await cRes.json() : (console.error('Chatters API error:', cRes.status), { chatters: [] });
+            const mData = mRes.ok ? await mRes.json() : (console.error('Models API error:', mRes.status), { models: [] });
+
             setChargebacks(cbData.chargebacks || []);
             setChatters(cData.chatters || []);
             setModels(mData.models || []);
+        } catch (err) {
+            console.error('loadData failed:', err);
+        } finally {
             setLoading(false);
-        });
+        }
     };
 
     const addChargeback = async () => {
