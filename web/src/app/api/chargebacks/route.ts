@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
 
     try {
-        const { subscriberName, userId, modelId, amount, ppvSentDate, chargebackDate, payoutPeriodId } = await req.json();
+        const { subscriberName, userId, userIds, modelId, amount, ppvSentDate, chargebackDate, payoutPeriodId } = await req.json();
 
         let periodId = payoutPeriodId ? parseInt(payoutPeriodId) : undefined;
         if (!periodId) {
@@ -32,18 +32,34 @@ export async function POST(req: Request) {
             periodId = activePeriod?.id;
         }
 
-        const chargeback = await prisma.chargeback.create({
-            data: {
-                subscriberName,
-                userId: parseInt(userId),
-                modelId: modelId ? parseInt(modelId) : null,
-                amount: parseFloat(amount),
-                ppvSentDate: ppvSentDate ? new Date(ppvSentDate) : null,
-                chargebackDate: chargebackDate ? new Date(chargebackDate) : null,
-                payoutPeriodId: periodId,
-            },
-        });
-        return NextResponse.json({ chargeback });
+        // Support multiple chatters - split amount equally
+        const ids: number[] = userIds?.length > 0
+            ? userIds.map((id: string) => parseInt(id))
+            : userId ? [parseInt(userId)] : [];
+
+        if (ids.length === 0) {
+            return NextResponse.json({ error: 'At least one chatter is required' }, { status: 400 });
+        }
+
+        const splitAmount = parseFloat(amount) / ids.length;
+
+        const chargebacks = await Promise.all(
+            ids.map(uid =>
+                prisma.chargeback.create({
+                    data: {
+                        subscriberName,
+                        userId: uid,
+                        modelId: modelId ? parseInt(modelId) : null,
+                        amount: splitAmount,
+                        ppvSentDate: ppvSentDate ? new Date(ppvSentDate) : null,
+                        chargebackDate: chargebackDate ? new Date(chargebackDate) : null,
+                        payoutPeriodId: periodId,
+                    },
+                })
+            )
+        );
+
+        return NextResponse.json({ chargebacks });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: 'Failed' }, { status: 500 });

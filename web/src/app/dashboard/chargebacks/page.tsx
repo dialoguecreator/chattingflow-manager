@@ -84,6 +84,102 @@ function SearchableSelect({ label, placeholder, items, value, onChange }: {
     );
 }
 
+function MultiSearchableSelect({ label, placeholder, items, values, onChange }: {
+    label: string;
+    placeholder: string;
+    items: { id: number; label: string }[];
+    values: string[];
+    onChange: (vals: string[]) => void;
+}) {
+    const [search, setSearch] = useState('');
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    const selectedItems = items.filter(i => values.includes(String(i.id)));
+    const filtered = items.filter(i =>
+        i.label.toLowerCase().includes(search.toLowerCase()) &&
+        !values.includes(String(i.id))
+    );
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const addItem = (id: string) => {
+        onChange([...values, id]);
+        setSearch('');
+    };
+
+    const removeItem = (id: string) => {
+        onChange(values.filter(v => v !== id));
+    };
+
+    return (
+        <div className="form-group" ref={ref} style={{ position: 'relative' }}>
+            <label className="form-label">{label}</label>
+            {selectedItems.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                    {selectedItems.map(item => (
+                        <span key={item.id} style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 6,
+                            padding: '4px 10px', borderRadius: 20,
+                            background: 'rgba(139, 92, 246, 0.2)', color: 'var(--accent-primary)',
+                            fontSize: 13, fontWeight: 500,
+                        }}>
+                            {item.label}
+                            <span onClick={() => removeItem(String(item.id))} style={{
+                                cursor: 'pointer', fontSize: 15, lineHeight: 1, opacity: 0.7,
+                            }}>×</span>
+                        </span>
+                    ))}
+                </div>
+            )}
+            <input
+                className="form-input"
+                placeholder={placeholder}
+                value={search}
+                onFocus={() => setOpen(true)}
+                onChange={e => { setSearch(e.target.value); setOpen(true); }}
+            />
+            {open && (
+                <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0,
+                    maxHeight: 200, overflowY: 'auto',
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-primary)',
+                    borderRadius: 'var(--radius-md)',
+                    zIndex: 100, marginTop: 4,
+                }}>
+                    {filtered.length > 0 ? filtered.map(item => (
+                        <div
+                            key={item.id}
+                            onClick={() => addItem(String(item.id))}
+                            style={{
+                                padding: '10px 14px', cursor: 'pointer', fontSize: 14,
+                                color: 'var(--text-primary)',
+                                borderBottom: '1px solid var(--border-primary)',
+                                transition: 'background 100ms',
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        >
+                            {item.label}
+                        </div>
+                    )) : (
+                        <div style={{ padding: '12px 14px', color: 'var(--text-muted)', fontSize: 13 }}>
+                            {items.length === values.length ? 'All chatters selected' : 'No results found'}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function ChargebacksPage() {
     const { status } = useSession();
     const router = useRouter();
@@ -95,7 +191,7 @@ export default function ChargebacksPage() {
     const [showAdd, setShowAdd] = useState(false);
     const [editingCb, setEditingCb] = useState<any | null>(null);
     const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
-    const [form, setForm] = useState({ subscriberName: '', userId: '', modelId: '', amount: '', ppvSentDate: '', chargebackDate: '', payoutPeriodId: '' });
+    const [form, setForm] = useState({ subscriberName: '', userIds: [] as string[], modelId: '', amount: '', ppvSentDate: '', chargebackDate: '', payoutPeriodId: '' });
     const [editForm, setEditForm] = useState({ subscriberName: '', userId: '', modelId: '', amount: '', ppvSentDate: '', chargebackDate: '', payoutPeriodId: '' });
 
     useEffect(() => { if (status === 'unauthenticated') router.push('/login'); }, [status, router]);
@@ -137,7 +233,7 @@ export default function ChargebacksPage() {
             body: JSON.stringify(form),
         });
         setShowAdd(false);
-        setForm({ subscriberName: '', userId: '', modelId: '', amount: '', ppvSentDate: '', chargebackDate: '', payoutPeriodId: '' });
+        setForm({ subscriberName: '', userIds: [], modelId: '', amount: '', ppvSentDate: '', chargebackDate: '', payoutPeriodId: '' });
         loadData();
     };
 
@@ -223,13 +319,18 @@ export default function ChargebacksPage() {
                                 <label className="form-label">Subscriber Name</label>
                                 <input className="form-input" value={form.subscriberName} onChange={e => setForm({ ...form, subscriberName: e.target.value })} />
                             </div>
-                            <SearchableSelect
-                                label="Chatter"
+                            <MultiSearchableSelect
+                                label="Chatter(s)"
                                 placeholder="Search chatter..."
                                 items={chatters.map((c: any) => ({ id: c.id, label: `${c.firstName} ${c.lastName}` }))}
-                                value={form.userId}
-                                onChange={val => setForm({ ...form, userId: val })}
+                                values={form.userIds}
+                                onChange={vals => setForm({ ...form, userIds: vals })}
                             />
+                            {form.userIds.length > 1 && (
+                                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -4, marginBottom: 8 }}>
+                                    💡 Amount will be split equally: ${form.amount ? (parseFloat(form.amount) / form.userIds.length).toFixed(2) : '0.00'} per chatter
+                                </div>
+                            )}
                             <SearchableSelect
                                 label="Model"
                                 placeholder="Search model..."
