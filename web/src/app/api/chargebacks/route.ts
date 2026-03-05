@@ -11,6 +11,7 @@ export async function GET() {
             include: {
                 user: { select: { firstName: true, lastName: true } },
                 model: { select: { name: true } },
+                payoutPeriod: { select: { startDate: true, endDate: true, status: true } },
             },
             orderBy: { createdAt: 'desc' },
         });
@@ -23,8 +24,14 @@ export async function POST(req: Request) {
     if (!auth.authorized) return NextResponse.json(auth.response, { status: auth.status });
 
     try {
-        const { subscriberName, userId, modelId, amount, ppvSentDate, chargebackDate } = await req.json();
-        const activePeriod = await prisma.payoutPeriod.findFirst({ where: { status: 'ACTIVE' }, orderBy: { startDate: 'desc' } });
+        const { subscriberName, userId, modelId, amount, ppvSentDate, chargebackDate, payoutPeriodId } = await req.json();
+
+        let periodId = payoutPeriodId ? parseInt(payoutPeriodId) : undefined;
+        if (!periodId) {
+            const activePeriod = await prisma.payoutPeriod.findFirst({ where: { status: 'ACTIVE' }, orderBy: { startDate: 'desc' } });
+            periodId = activePeriod?.id;
+        }
+
         const chargeback = await prisma.chargeback.create({
             data: {
                 subscriberName,
@@ -33,7 +40,7 @@ export async function POST(req: Request) {
                 amount: parseFloat(amount),
                 ppvSentDate: ppvSentDate ? new Date(ppvSentDate) : null,
                 chargebackDate: chargebackDate ? new Date(chargebackDate) : null,
-                payoutPeriodId: activePeriod?.id,
+                payoutPeriodId: periodId,
             },
         });
         return NextResponse.json({ chargeback });

@@ -90,31 +90,39 @@ export default function ChargebacksPage() {
     const [chargebacks, setChargebacks] = useState<any[]>([]);
     const [chatters, setChatters] = useState<any[]>([]);
     const [models, setModels] = useState<any[]>([]);
+    const [periods, setPeriods] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAdd, setShowAdd] = useState(false);
     const [editingCb, setEditingCb] = useState<any | null>(null);
     const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
-    const [form, setForm] = useState({ subscriberName: '', userId: '', modelId: '', amount: '', ppvSentDate: '', chargebackDate: '' });
-    const [editForm, setEditForm] = useState({ subscriberName: '', userId: '', modelId: '', amount: '', ppvSentDate: '', chargebackDate: '' });
+    const [form, setForm] = useState({ subscriberName: '', userId: '', modelId: '', amount: '', ppvSentDate: '', chargebackDate: '', payoutPeriodId: '' });
+    const [editForm, setEditForm] = useState({ subscriberName: '', userId: '', modelId: '', amount: '', ppvSentDate: '', chargebackDate: '', payoutPeriodId: '' });
 
     useEffect(() => { if (status === 'unauthenticated') router.push('/login'); }, [status, router]);
     useEffect(() => { loadData(); }, []);
 
     const loadData = async () => {
         try {
-            const [cbRes, cRes, mRes] = await Promise.all([
+            const [cbRes, cRes, mRes, pRes] = await Promise.all([
                 fetch('/api/chargebacks'),
                 fetch('/api/chatters'),
                 fetch('/api/models'),
+                fetch('/api/chargebacks/periods'),
             ]);
 
             const cbData = cbRes.ok ? await cbRes.json() : (console.error('Chargebacks API error:', cbRes.status), { chargebacks: [] });
             const cData = cRes.ok ? await cRes.json() : (console.error('Chatters API error:', cRes.status), { chatters: [] });
             const mData = mRes.ok ? await mRes.json() : (console.error('Models API error:', mRes.status), { models: [] });
+            const pData = pRes.ok ? await pRes.json() : (console.error('Periods API error:', pRes.status), { periods: [] });
 
             setChargebacks(cbData.chargebacks || []);
             setChatters(cData.chatters || []);
             setModels(mData.models || []);
+            const allPeriods = pData.periods || [];
+            setPeriods(allPeriods);
+            // Default to active period for the add form
+            const activePeriod = allPeriods.find((p: any) => p.status === 'ACTIVE');
+            if (activePeriod) setForm(prev => ({ ...prev, payoutPeriodId: String(activePeriod.id) }));
         } catch (err) {
             console.error('loadData failed:', err);
         } finally {
@@ -129,7 +137,7 @@ export default function ChargebacksPage() {
             body: JSON.stringify(form),
         });
         setShowAdd(false);
-        setForm({ subscriberName: '', userId: '', modelId: '', amount: '', ppvSentDate: '', chargebackDate: '' });
+        setForm({ subscriberName: '', userId: '', modelId: '', amount: '', ppvSentDate: '', chargebackDate: '', payoutPeriodId: '' });
         loadData();
     };
 
@@ -142,6 +150,7 @@ export default function ChargebacksPage() {
             amount: cb.amount?.toString() || '',
             ppvSentDate: cb.ppvSentDate ? new Date(cb.ppvSentDate).toISOString().split('T')[0] : '',
             chargebackDate: cb.chargebackDate ? new Date(cb.chargebackDate).toISOString().split('T')[0] : '',
+            payoutPeriodId: String(cb.payoutPeriodId || ''),
         });
     };
 
@@ -174,7 +183,7 @@ export default function ChargebacksPage() {
                         <div className="table-container">
                             <table>
                                 <thead>
-                                    <tr><th>Subscriber</th><th>Chatter</th><th>Model</th><th>Amount</th><th>PPV Sent</th><th>Chargeback Date</th><th>Actions</th></tr>
+                                    <tr><th>Subscriber</th><th>Chatter</th><th>Model</th><th>Amount</th><th>PPV Sent</th><th>Chargeback Date</th><th>Period</th><th>Actions</th></tr>
                                 </thead>
                                 <tbody>
                                     {chargebacks.map((cb: any) => (
@@ -185,6 +194,7 @@ export default function ChargebacksPage() {
                                             <td style={{ color: 'var(--danger)', fontWeight: 700 }}>-${cb.amount?.toFixed(2)}</td>
                                             <td>{cb.ppvSentDate ? new Date(cb.ppvSentDate).toLocaleDateString() : '—'}</td>
                                             <td>{cb.chargebackDate ? new Date(cb.chargebackDate).toLocaleDateString() : '—'}</td>
+                                            <td>{cb.payoutPeriod ? <span className="badge badge-primary" style={{ fontSize: 11 }}>{new Date(cb.payoutPeriod.startDate).toLocaleDateString()} - {new Date(cb.payoutPeriod.endDate).toLocaleDateString()}</span> : '—'}</td>
                                             <td>
                                                 <div style={{ display: 'flex', gap: 6 }}>
                                                     <button className="btn btn-sm btn-secondary" onClick={() => openEdit(cb)}>✏️ Edit</button>
@@ -239,6 +249,13 @@ export default function ChargebacksPage() {
                                 <label className="form-label">Chargeback Date (optional)</label>
                                 <input className="form-input" type="date" value={form.chargebackDate} onChange={e => setForm({ ...form, chargebackDate: e.target.value })} />
                             </div>
+                            <SearchableSelect
+                                label="Payout Period"
+                                placeholder="Select period..."
+                                items={periods.map((p: any) => ({ id: p.id, label: `${new Date(p.startDate).toLocaleDateString()} - ${new Date(p.endDate).toLocaleDateString()}${p.status === 'ACTIVE' ? ' (Active)' : ''}` }))}
+                                value={form.payoutPeriodId}
+                                onChange={val => setForm({ ...form, payoutPeriodId: val })}
+                            />
                             <div className="modal-actions">
                                 <button className="btn btn-secondary" onClick={() => setShowAdd(false)}>Cancel</button>
                                 <button className="btn btn-danger" onClick={addChargeback}>Add Chargeback</button>
@@ -282,30 +299,40 @@ export default function ChargebacksPage() {
                                 <label className="form-label">Chargeback Date</label>
                                 <input className="form-input" type="date" value={editForm.chargebackDate} onChange={e => setEditForm({ ...editForm, chargebackDate: e.target.value })} />
                             </div>
+                            <SearchableSelect
+                                label="Payout Period"
+                                placeholder="Select period..."
+                                items={periods.map((p: any) => ({ id: p.id, label: `${new Date(p.startDate).toLocaleDateString()} - ${new Date(p.endDate).toLocaleDateString()}${p.status === 'ACTIVE' ? ' (Active)' : ''}` }))}
+                                value={editForm.payoutPeriodId}
+                                onChange={val => setEditForm({ ...editForm, payoutPeriodId: val })}
+                            />
                             <div className="modal-actions">
                                 <button className="btn btn-secondary" onClick={() => setEditingCb(null)}>Cancel</button>
                                 <button className="btn btn-primary" onClick={saveEdit}>💾 Save Changes</button>
                             </div>
                         </div>
-                    </div>
-                )}
+                    </div >
+                )
+                }
 
                 {/* Delete Confirm Modal */}
-                {confirmDelete !== null && (
-                    <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
-                        <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
-                            <h3 className="modal-title">Delete Chargeback</h3>
-                            <p style={{ color: 'var(--text-secondary)', margin: '12px 0 24px' }}>
-                                Are you sure you want to delete this chargeback? This action cannot be undone.
-                            </p>
-                            <div className="modal-actions">
-                                <button className="btn btn-secondary" onClick={() => setConfirmDelete(null)}>Cancel</button>
-                                <button className="btn btn-danger" onClick={() => deleteChargeback(confirmDelete)}>🗑️ Delete</button>
+                {
+                    confirmDelete !== null && (
+                        <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
+                            <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+                                <h3 className="modal-title">Delete Chargeback</h3>
+                                <p style={{ color: 'var(--text-secondary)', margin: '12px 0 24px' }}>
+                                    Are you sure you want to delete this chargeback? This action cannot be undone.
+                                </p>
+                                <div className="modal-actions">
+                                    <button className="btn btn-secondary" onClick={() => setConfirmDelete(null)}>Cancel</button>
+                                    <button className="btn btn-danger" onClick={() => deleteChargeback(confirmDelete)}>🗑️ Delete</button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )}
-            </div>
+                    )
+                }
+            </div >
         </>
     );
 }

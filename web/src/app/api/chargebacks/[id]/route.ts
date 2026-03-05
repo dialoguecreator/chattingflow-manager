@@ -8,7 +8,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     const { id } = await params;
     try {
-        const { subscriberName, userId, modelId, amount, ppvSentDate, chargebackDate } = await req.json();
+        const { subscriberName, userId, modelId, amount, ppvSentDate, chargebackDate, payoutPeriodId } = await req.json();
         const chargeback = await prisma.chargeback.update({
             where: { id: parseInt(id) },
             data: {
@@ -18,6 +18,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                 ...(amount !== undefined && { amount: parseFloat(amount) }),
                 ...(ppvSentDate !== undefined && { ppvSentDate: ppvSentDate ? new Date(ppvSentDate) : null }),
                 ...(chargebackDate !== undefined && { chargebackDate: chargebackDate ? new Date(chargebackDate) : null }),
+                ...(payoutPeriodId !== undefined && { payoutPeriodId: payoutPeriodId ? parseInt(payoutPeriodId) : null }),
             },
         });
         return NextResponse.json({ chargeback });
