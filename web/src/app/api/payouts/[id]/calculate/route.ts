@@ -74,6 +74,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             ...Object.keys(staffByUser).map(Number),
         ]);
 
+        // Fetch hasFee for all users via raw SQL (bypasses potential Prisma client type issues)
+        const userFeeRows: any[] = await prisma.$queryRaw`SELECT id, "hasFee" FROM "User"`;
+        const feeByUser: Record<number, boolean> = {};
+        for (const row of userFeeRows) {
+            feeByUser[row.id] = row.hasFee;
+        }
+
         // Create/update payout entries
         // Formula: (((Total Sales - Chargebacks) * commission%) - punishment + bonus) - 5% Fee
         for (const userId of allUserIds) {
@@ -85,14 +92,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             const salary = staffByUser[userId] || 0;
             const isStaff = staffByUser[userId] !== undefined;
 
-            // Fetch user's fee preference
-            const userRecord = await prisma.user.findUnique({
-                where: { id: userId },
-            });
             // Staff never pay fee; chatters respect their hasFee setting
-            const userHasFee = (userRecord as any)?.hasFee ?? true;
+            const userHasFee = feeByUser[userId] ?? true;
             const feePercent = (isStaff || !userHasFee) ? 0 : 5.0;
-            console.log(`[CALC] userId=${userId} isStaff=${isStaff} hasFee=${userHasFee} => feePercent=${feePercent}`);
 
             // Check if entry already exists (to preserve manually-set bonus)
             const existing = await prisma.payoutEntry.findUnique({
