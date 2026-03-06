@@ -116,6 +116,8 @@ export default function InvoicesPage() {
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
     const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchTimer, setSearchTimer] = useState<any>(null);
 
     // Add shift modal
     const [showAdd, setShowAdd] = useState(false);
@@ -171,9 +173,11 @@ export default function InvoicesPage() {
         if (status === 'unauthenticated') router.push('/login');
     }, [status, router]);
 
-    const fetchInvoices = (p: number = page) => {
+    const fetchInvoices = (p: number = page, q: string = searchQuery) => {
         setLoading(true);
-        fetch(`/api/invoices?page=${p}&limit=50`)
+        const params = new URLSearchParams({ page: String(p), limit: '50' });
+        if (q) params.set('search', q);
+        fetch(`/api/invoices?${params}`)
             .then(r => r.json())
             .then(d => {
                 setInvoices(d.invoices || []);
@@ -184,7 +188,16 @@ export default function InvoicesPage() {
             .catch(() => setLoading(false));
     };
 
-    useEffect(() => { fetchInvoices(page); }, [page]);
+    useEffect(() => { fetchInvoices(page, searchQuery); }, [page]);
+
+    const handleSearch = (value: string) => {
+        setSearchQuery(value);
+        if (searchTimer) clearTimeout(searchTimer);
+        setSearchTimer(setTimeout(() => {
+            setPage(1);
+            fetchInvoices(1, value);
+        }, 400));
+    };
 
     // Load chatters and models for the add modal
     const openAddModal = () => {
@@ -268,6 +281,28 @@ export default function InvoicesPage() {
             </header>
             <div className="main-body">
                 <div className="card">
+                    {/* Search Bar */}
+                    <div style={{ marginBottom: 16, position: 'relative' }}>
+                        <input
+                            className="form-input"
+                            placeholder="🔍 Search by chatter, model, amount, summary..."
+                            value={searchQuery}
+                            onChange={e => handleSearch(e.target.value)}
+                            style={{ paddingRight: 36, fontSize: 14 }}
+                        />
+                        {searchQuery && (
+                            <button
+                                onClick={() => { setSearchQuery(''); setPage(1); fetchInvoices(1, ''); }}
+                                style={{
+                                    position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                                    background: 'none', border: 'none', color: 'var(--text-muted)',
+                                    cursor: 'pointer', fontSize: 16, padding: '2px 6px',
+                                }}
+                            >
+                                ✕
+                            </button>
+                        )}
+                    </div>
                     {loading ? (
                         <p className="text-muted">Loading...</p>
                     ) : invoices.length > 0 ? (

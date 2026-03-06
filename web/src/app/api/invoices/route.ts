@@ -8,11 +8,27 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
+    const search = searchParams.get('search')?.trim() || '';
     const skip = (page - 1) * limit;
 
     try {
+        // Build search filter
+        const where: any = {};
+        if (search) {
+            const numSearch = parseFloat(search);
+            where.OR = [
+                { user: { firstName: { contains: search, mode: 'insensitive' } } },
+                { user: { lastName: { contains: search, mode: 'insensitive' } } },
+                { user: { username: { contains: search, mode: 'insensitive' } } },
+                { model: { name: { contains: search, mode: 'insensitive' } } },
+                { shiftSummary: { contains: search, mode: 'insensitive' } },
+                ...(!isNaN(numSearch) ? [{ totalGross: numSearch }] : []),
+            ];
+        }
+
         const [invoices, total] = await Promise.all([
             prisma.invoice.findMany({
+                where,
                 include: {
                     user: { select: { id: true, firstName: true, lastName: true, username: true, discordUsername: true } },
                     model: { select: { id: true, name: true } },
@@ -22,7 +38,7 @@ export async function GET(req: Request) {
                 skip,
                 take: limit,
             }),
-            prisma.invoice.count(),
+            prisma.invoice.count({ where }),
         ]);
 
         // Find split partners
