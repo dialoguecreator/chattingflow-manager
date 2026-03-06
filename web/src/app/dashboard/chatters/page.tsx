@@ -62,6 +62,15 @@ export default function ChattersPage() {
         loadChatters();
     };
 
+    const toggleFee = async (userId: number, currentHasFee: boolean) => {
+        await fetch(`/api/chatters/${userId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ hasFee: !currentHasFee }),
+        });
+        loadChatters();
+    };
+
     const activeChatters = chatters.filter(c => (c.status || 'ACTIVE') === 'ACTIVE');
     const firedChatters = chatters.filter(c => c.status === 'FIRED');
 
@@ -95,6 +104,7 @@ export default function ChattersPage() {
                                         <th>Discord</th>
                                         <th>Commission (Net)</th>
                                         <th>Commission (Gross)</th>
+                                        <th>5% Fee</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -113,6 +123,15 @@ export default function ChattersPage() {
                                                 )}
                                             </td>
                                             <td>{parseFloat(Number(c.commissionGross).toFixed(2))}%</td>
+                                            <td>
+                                                <button
+                                                    className={`btn btn-sm ${c.hasFee !== false ? 'btn-primary' : 'btn-secondary'}`}
+                                                    onClick={() => toggleFee(c.id, c.hasFee !== false)}
+                                                    style={{ minWidth: 50, fontSize: 13 }}
+                                                >
+                                                    {c.hasFee !== false ? '✅ Yes' : '❌ No'}
+                                                </button>
+                                            </td>
                                             <td>
                                                 {editing === c.id ? (
                                                     <div className="flex gap-2">

@@ -19,6 +19,7 @@ model User {
   status          String   @default("ACTIVE") // ACTIVE, FIRED
   commissionNet   Float    @default(5.0)  // 5% net
   commissionGross Float    @default(4.0)  // 4% gross (net * 0.8)
+  hasFee          Boolean  @default(true) // Whether 5% agency fee applies
   discordId       String?  @unique
   discordUsername  String?
   inviteToken     String?  // null = activated

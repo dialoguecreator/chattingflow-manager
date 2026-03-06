@@ -83,7 +83,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             const punishmentDeductions = punByUser[userId] || 0;
             const massPPVEarnings = ppvByUser[userId] || 0; // bonus
             const salary = staffByUser[userId] || 0;
-            const feePercent = 5.0;
+            const isStaff = staffByUser[userId] !== undefined;
+
+            // Fetch user's fee preference
+            const userRecord = await prisma.user.findUnique({
+                where: { id: userId },
+                select: { hasFee: true },
+            });
+            // Staff never pay fee; chatters respect their hasFee setting
+            const feePercent = (isStaff || !userRecord?.hasFee) ? 0 : 5.0;
 
             // Check if entry already exists (to preserve manually-set bonus)
             const existing = await prisma.payoutEntry.findUnique({

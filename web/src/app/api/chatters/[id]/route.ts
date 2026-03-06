@@ -14,6 +14,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         if (body.commissionNet !== undefined) updateData.commissionNet = body.commissionNet;
         if (body.commissionGross !== undefined) updateData.commissionGross = body.commissionGross;
         if (body.status !== undefined) updateData.status = body.status;
+        if (body.hasFee !== undefined) updateData.hasFee = body.hasFee;
 
         const user = await prisma.user.update({
             where: { id: userId },
