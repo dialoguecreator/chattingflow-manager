@@ -88,10 +88,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             // Fetch user's fee preference
             const userRecord = await prisma.user.findUnique({
                 where: { id: userId },
-                select: { hasFee: true },
             });
             // Staff never pay fee; chatters respect their hasFee setting
-            const feePercent = (isStaff || !userRecord?.hasFee) ? 0 : 5.0;
+            const userHasFee = (userRecord as any)?.hasFee ?? true;
+            const feePercent = (isStaff || !userHasFee) ? 0 : 5.0;
+            console.log(`[CALC] userId=${userId} isStaff=${isStaff} hasFee=${userHasFee} => feePercent=${feePercent}`);
 
             // Check if entry already exists (to preserve manually-set bonus)
             const existing = await prisma.payoutEntry.findUnique({
