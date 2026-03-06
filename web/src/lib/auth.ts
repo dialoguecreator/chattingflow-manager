@@ -35,8 +35,15 @@ export const authOptions: AuthOptions = {
     callbacks: {
         async jwt({ token, user }: any) {
             if (user) {
-                token.role = user.role;
                 token.userId = parseInt(user.id);
+            }
+            // Always refresh role from DB so role changes take effect immediately
+            if (token.userId) {
+                const dbUser = await prisma.user.findUnique({
+                    where: { id: token.userId },
+                    select: { role: true },
+                });
+                if (dbUser) token.role = dbUser.role;
             }
             return token;
         },
