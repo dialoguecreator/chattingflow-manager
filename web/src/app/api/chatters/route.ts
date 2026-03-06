@@ -12,7 +12,7 @@ export async function GET() {
             select: {
                 id: true, firstName: true, lastName: true, username: true,
                 discordUsername: true, discordId: true,
-                commissionNet: true, commissionGross: true,
+                commissionNet: true, commissionGross: true, status: true,
             },
             orderBy: { firstName: 'asc' },
         });
