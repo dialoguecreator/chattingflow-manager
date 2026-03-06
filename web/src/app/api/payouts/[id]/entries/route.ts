@@ -66,6 +66,26 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             return NextResponse.json({ entry });
         }
 
+        // If updating feePercent — recalculate feeAmount and netPayout
+        if (body.feePercent !== undefined) {
+            const existing = await prisma.payoutEntry.findUnique({ where: { id: entryId } });
+            if (!existing) return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
+
+            const feePercent = parseFloat(body.feePercent) || 0;
+            const bonus = existing.bonus || 0;
+            const afterChargebacks = existing.totalGross - existing.chargebackDeductions;
+            const commissionEarnings = afterChargebacks * (existing.commissionRate / 100);
+            const beforeFee = commissionEarnings - existing.punishmentDeductions + bonus;
+            const feeAmount = beforeFee > 0 ? beforeFee * (feePercent / 100) : 0;
+            const netPayout = (beforeFee - feeAmount) + existing.staffSalary;
+
+            const entry = await prisma.payoutEntry.update({
+                where: { id: entryId },
+                data: { feePercent, feeAmount, netPayout },
+            });
+            return NextResponse.json({ entry });
+        }
+
         return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
     } catch (error) {
         return NextResponse.json({ error: 'Failed' }, { status: 500 });

@@ -39,6 +39,10 @@ export default function PayoutsPage() {
     const [editingBonus, setEditingBonus] = useState<number | null>(null);
     const [bonusValue, setBonusValue] = useState('');
 
+    // Editable fee
+    const [editingFee, setEditingFee] = useState<number | null>(null);
+    const [feeValue, setFeeValue] = useState('');
+
     // Expenses
     const [expenses, setExpenses] = useState<any[]>([]);
     const [expenseForm, setExpenseForm] = useState({ description: '', amount: '' });
@@ -115,6 +119,20 @@ export default function PayoutsPage() {
             setEntries(prev => prev.map(e => e.id === entryId ? { ...e, ...data.entry } : e));
         }
         setEditingBonus(null);
+    };
+
+    // Save fee
+    const saveFee = async (entryId: number) => {
+        const res = await fetch(`/api/payouts/${selectedPeriod.id}/entries`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entryId, feePercent: parseFloat(feeValue) || 0 }),
+        });
+        const data = await res.json();
+        if (res.ok && data.entry) {
+            setEntries(prev => prev.map(e => e.id === entryId ? { ...e, ...data.entry } : e));
+        }
+        setEditingFee(null);
     };
 
     // Add expense
@@ -320,7 +338,7 @@ export default function PayoutsPage() {
                                                 <th>Commission</th>
                                                 <th>Punishments</th>
                                                 <th>Bonus</th>
-                                                <th>Fee (5%)</th>
+                                                <th>Fee</th>
                                                 <th>Payout</th>
                                             </tr>
                                         </thead>
@@ -333,7 +351,8 @@ export default function PayoutsPage() {
                                                 const pun = e.punishmentDeductions || 0;
                                                 const bonus = e.bonus || e.massPPVEarnings || 0;
                                                 const beforeFee = commission - pun + bonus;
-                                                const fee = beforeFee > 0 ? beforeFee * 0.05 : 0;
+                                                const feePercent = e.feePercent ?? 5;
+                                                const fee = beforeFee > 0 ? beforeFee * (feePercent / 100) : 0;
                                                 const payout = beforeFee - fee + (e.staffSalary || 0);
 
                                                 const isStaff = e.user?.role && e.user.role !== 'CHATTER';
@@ -422,7 +441,34 @@ export default function PayoutsPage() {
                                                                     <span title="Click to edit bonus">+${fmt(bonus)}</span>
                                                                 )}
                                                             </td>
-                                                            <td style={{ color: 'var(--warning)' }}>-${fmt(fee)}</td>
+                                                            <td
+                                                                style={{ color: 'var(--warning)', cursor: 'pointer' }}
+                                                                onClick={(ev) => {
+                                                                    ev.stopPropagation();
+                                                                    setEditingFee(e.id);
+                                                                    setFeeValue(feePercent.toString());
+                                                                }}
+                                                            >
+                                                                {editingFee === e.id ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.1"
+                                                                        value={feeValue}
+                                                                        onChange={ev => setFeeValue(ev.target.value)}
+                                                                        onBlur={() => saveFee(e.id)}
+                                                                        onKeyDown={ev => { if (ev.key === 'Enter') saveFee(e.id); if (ev.key === 'Escape') setEditingFee(null); }}
+                                                                        onClick={ev => ev.stopPropagation()}
+                                                                        autoFocus
+                                                                        style={{
+                                                                            width: 60, padding: '2px 6px', fontSize: 13,
+                                                                            background: 'var(--bg-secondary)', border: '1px solid var(--accent-primary)',
+                                                                            borderRadius: 4, color: 'var(--text-primary)',
+                                                                        }}
+                                                                    />
+                                                                ) : (
+                                                                    <span title="Click to edit fee %">-${fmt(fee)} ({feePercent}%)</span>
+                                                                )}
+                                                            </td>
                                                             <td style={{ color: 'var(--accent-primary)', fontWeight: 700, fontSize: 15 }}>
                                                                 ${fmt(payout)}
                                                             </td>
