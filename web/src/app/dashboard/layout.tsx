@@ -13,7 +13,7 @@ const navItems = [
     { label: 'Payouts', href: '/dashboard/payouts', icon: '💸', adminOnly: true },
     { label: 'Chargebacks', href: '/dashboard/chargebacks', icon: '↩️' },
     { label: 'Mass PPVs', href: '/dashboard/mass-ppvs', icon: '📨' },
-    { label: 'Models', href: '/dashboard/models', icon: '🏷️', adminOnly: true },
+    { label: 'Models', href: '/dashboard/models', icon: '🏷️', superAdminOnly: true },
     { section: 'People' },
     { label: 'Chatters', href: '/dashboard/chatters', icon: '💬' },
     { label: 'Staff', href: '/dashboard/staff', icon: '👥' },
@@ -28,6 +28,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     const { data: session } = useSession();
     const userRole = (session?.user as any)?.role || '';
     const isAdminOrManager = userRole === 'ADMIN' || userRole === 'MANAGER';
+    const isAdmin = userRole === 'ADMIN';
 
     return (
         <div className="app-layout">
@@ -59,6 +60,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     {navItems.map((item, i) => {
                         if ('section' in item) {
                             return <div key={i} className="nav-section-label">{item.section}</div>;
+                        }
+                        // Hide super-admin-only items (ADMIN only)
+                        if (item.superAdminOnly && !isAdmin) {
+                            return null;
                         }
                         // Hide admin-only items for non-admin/non-manager users
                         if (item.adminOnly && !isAdminOrManager) {
