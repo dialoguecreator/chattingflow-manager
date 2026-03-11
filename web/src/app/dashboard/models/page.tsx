@@ -70,6 +70,15 @@ export default function ModelsPage() {
     const [editingClientId, setEditingClientId] = useState<number | null>(null);
     const [editingClientValue, setEditingClientValue] = useState('');
 
+    // Payment records (ledger)
+    const [paymentRecords, setPaymentRecords] = useState<any[]>([]);
+    const [paymentRecordsLoading, setPaymentRecordsLoading] = useState(false);
+    const [showAddPayment, setShowAddPayment] = useState(false);
+    const [paymentForm, setPaymentForm] = useState({
+        clientName: '', amount: '', periodFrom: '', periodTo: '', receivedAt: '', note: '',
+    });
+    const [paymentFormError, setPaymentFormError] = useState('');
+
     const userRole = (session?.user as any)?.role || '';
 
     useEffect(() => {
@@ -77,7 +86,7 @@ export default function ModelsPage() {
         if (status === 'authenticated' && userRole !== 'ADMIN') router.push('/dashboard');
     }, [status, userRole, router]);
 
-    useEffect(() => { loadData(); }, []);
+    useEffect(() => { loadData(); loadPaymentRecords(); }, []);
 
     const loadData = () => {
         setLoading(true);
@@ -117,6 +126,69 @@ export default function ModelsPage() {
     }, [clientPeriod, customFrom, customTo]);
 
     useEffect(() => { loadClientSummary(); }, [loadClientSummary]);
+
+    // Load payment records
+    const loadPaymentRecords = () => {
+        setPaymentRecordsLoading(true);
+        fetch('/api/clients/records')
+            .then(r => r.json())
+            .then(d => {
+                setPaymentRecords(d.records || []);
+                setPaymentRecordsLoading(false);
+            })
+            .catch(() => setPaymentRecordsLoading(false));
+    };
+
+    const addPaymentRecord = async () => {
+        setPaymentFormError('');
+        if (!paymentForm.clientName || !paymentForm.amount || !paymentForm.periodFrom || !paymentForm.periodTo) {
+            setPaymentFormError('Client, amount, and period are required');
+            return;
+        }
+        try {
+            const res = await fetch('/api/clients/records', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(paymentForm),
+            });
+            if (!res.ok) {
+                const data = await res.json();
+                setPaymentFormError(data.error || 'Failed');
+                return;
+            }
+            setShowAddPayment(false);
+            setPaymentForm({ clientName: '', amount: '', periodFrom: '', periodTo: '', receivedAt: '', note: '' });
+            loadPaymentRecords();
+        } catch { setPaymentFormError('Network error'); }
+    };
+
+    const deletePaymentRecord = async (id: number) => {
+        if (!confirm('Delete this payment record?')) return;
+        await fetch('/api/clients/records', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id }),
+        });
+        loadPaymentRecords();
+    };
+
+    // Group payment records by month
+    const groupedRecords = (() => {
+        const groups: Record<string, any[]> = {};
+        for (const rec of paymentRecords) {
+            const d = new Date(rec.receivedAt);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            if (!groups[key]) groups[key] = [];
+            groups[key].push({ ...rec, monthLabel: label });
+        }
+        return Object.entries(groups)
+            .sort(([a], [b]) => b.localeCompare(a))
+            .map(([key, recs]) => ({ key, label: recs[0].monthLabel, records: recs }));
+    })();
+
+    // Get unique client names for the payment form dropdown
+    const clientNames = [...new Set(models.filter(m => m.clientName).map(m => m.clientName))];
 
     const openEdit = (model: any) => {
         setEditingModel(model);
@@ -602,6 +674,203 @@ export default function ModelsPage() {
                         </div>
                     )}
                 </div>
+
+                {/* ═══════════════════════════════════════════════════════════════ */}
+                {/* PAYMENT RECORDS LEDGER */}
+                {/* ═══════════════════════════════════════════════════════════════ */}
+                <div className="card" style={{ marginTop: 24 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+                        <div>
+                            <h2 style={{ margin: 0, fontWeight: 700, fontSize: 20, color: 'var(--text-primary)' }}>
+                                💰 Payment Records
+                            </h2>
+                            <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: 13 }}>
+                                Log all payments received from clients. Grouped by month.
+                            </p>
+                        </div>
+                        <button
+                            className="btn btn-primary btn-sm"
+                            onClick={() => { setShowAddPayment(true); setPaymentFormError(''); }}
+                        >
+                            + Add Payment
+                        </button>
+                    </div>
+
+                    {paymentRecordsLoading ? (
+                        <p className="text-muted">Loading records...</p>
+                    ) : groupedRecords.length > 0 ? (
+                        groupedRecords.map(group => (
+                            <div key={group.key} style={{ marginBottom: 24 }}>
+                                <h4 style={{
+                                    margin: '0 0 10px', fontWeight: 600, fontSize: 15,
+                                    color: 'var(--accent-primary)',
+                                    borderBottom: '1px solid var(--border-primary)',
+                                    paddingBottom: 6,
+                                }}>
+                                    📅 {group.label}
+                                    <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--text-muted)', fontWeight: 400 }}>
+                                        ({group.records.length} payment{group.records.length > 1 ? 's' : ''})
+                                        {' — '}
+                                        Total: <strong style={{ color: 'var(--success)' }}>
+                                            ${fmt(group.records.reduce((s: number, r: any) => s + r.amount, 0))}
+                                        </strong>
+                                    </span>
+                                </h4>
+                                <div className="table-container">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Client</th>
+                                                <th>Amount Received</th>
+                                                <th>Earning Period</th>
+                                                <th>Received On</th>
+                                                <th>Note</th>
+                                                <th style={{ width: 40 }}></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {group.records.map((rec: any) => (
+                                                <tr key={rec.id}>
+                                                    <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                                                        {rec.clientName}
+                                                    </td>
+                                                    <td style={{ color: 'var(--success)', fontWeight: 700, fontSize: 15 }}>
+                                                        ${fmt(rec.amount)}
+                                                    </td>
+                                                    <td style={{ fontSize: 13 }}>
+                                                        <span style={{ color: 'var(--text-secondary)' }}>
+                                                            {new Date(rec.periodFrom).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                            {' → '}
+                                                            {new Date(rec.periodTo).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                                                        {new Date(rec.receivedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                        <span style={{ marginLeft: 4, fontSize: 11, color: 'var(--text-muted)' }}>
+                                                            {new Date(rec.receivedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {rec.note || '—'}
+                                                    </td>
+                                                    <td>
+                                                        <button
+                                                            className="btn btn-sm btn-danger"
+                                                            style={{ padding: '2px 8px', fontSize: 11 }}
+                                                            onClick={() => deletePaymentRecord(rec.id)}
+                                                        >🗑️</button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="empty-state">
+                            <div className="empty-state-icon">💰</div>
+                            <div className="empty-state-text">
+                                No payments recorded yet. Click "Add Payment" to log a client payment.
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Add Payment Modal */}
+                {showAddPayment && (
+                    <div className="modal-overlay" onClick={() => setShowAddPayment(false)}>
+                        <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+                            <h3 className="modal-title">💰 Record Payment</h3>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: '0 0 16px' }}>
+                                Log a payment received from a client.
+                            </p>
+                            {paymentFormError && (
+                                <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, color: 'var(--danger)', fontSize: 13 }}>
+                                    {paymentFormError}
+                                </div>
+                            )}
+                            <div className="form-group">
+                                <label className="form-label">Client</label>
+                                {clientNames.length > 0 ? (
+                                    <select
+                                        className="form-input"
+                                        value={paymentForm.clientName}
+                                        onChange={e => setPaymentForm({ ...paymentForm, clientName: e.target.value })}
+                                    >
+                                        <option value="">Select client...</option>
+                                        {clientNames.map(cn => (
+                                            <option key={cn} value={cn}>{cn}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <input
+                                        className="form-input"
+                                        value={paymentForm.clientName}
+                                        onChange={e => setPaymentForm({ ...paymentForm, clientName: e.target.value })}
+                                        placeholder="Client name"
+                                    />
+                                )}
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Amount Received ($)</label>
+                                <input
+                                    className="form-input"
+                                    type="number"
+                                    step="0.01"
+                                    value={paymentForm.amount}
+                                    onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                                    placeholder="e.g. 5000.00"
+                                />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                <div className="form-group">
+                                    <label className="form-label">Earning Period From</label>
+                                    <input
+                                        className="form-input"
+                                        type="datetime-local"
+                                        value={paymentForm.periodFrom}
+                                        onChange={e => setPaymentForm({ ...paymentForm, periodFrom: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Earning Period To</label>
+                                    <input
+                                        className="form-input"
+                                        type="datetime-local"
+                                        value={paymentForm.periodTo}
+                                        onChange={e => setPaymentForm({ ...paymentForm, periodTo: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Date Received</label>
+                                <input
+                                    className="form-input"
+                                    type="datetime-local"
+                                    value={paymentForm.receivedAt}
+                                    onChange={e => setPaymentForm({ ...paymentForm, receivedAt: e.target.value })}
+                                />
+                                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                                    Leave empty for current date/time.
+                                </p>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Note (optional)</label>
+                                <input
+                                    className="form-input"
+                                    value={paymentForm.note}
+                                    onChange={e => setPaymentForm({ ...paymentForm, note: e.target.value })}
+                                    placeholder="e.g. Wire transfer, PayPal, etc."
+                                />
+                            </div>
+                            <div className="modal-actions">
+                                <button className="btn btn-secondary" onClick={() => setShowAddPayment(false)}>Cancel</button>
+                                <button className="btn btn-primary" onClick={addPaymentRecord}>💰 Save Payment</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Edit Model Modal */}
                 {editingModel && (

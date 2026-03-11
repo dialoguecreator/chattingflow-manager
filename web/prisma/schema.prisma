@@ -363,6 +363,21 @@ model ClientPayment {
   @@unique([clientName, periodStart, periodEnd])
 }
 
+// ─── Client Payment Records (Ledger) ─────────────────────
+model ClientPaymentRecord {
+  id          Int      @id @default(autoincrement())
+  clientName  String
+  amount      Float    // amount received
+  periodFrom  DateTime // earning period start
+  periodTo    DateTime // earning period end
+  receivedAt  DateTime @default(now()) // when payment was received
+  note        String?  // optional note
+  createdAt   DateTime @default(now())
+
+  @@index([clientName])
+  @@index([receivedAt])
+}
+
 // ─── Settings ─────────────────────────────────────────────
 model Setting {
   key       String   @id
