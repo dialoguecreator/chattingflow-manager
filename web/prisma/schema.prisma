@@ -354,7 +354,9 @@ model ClientPayment {
   periodStart DateTime
   periodEnd   DateTime
   paid        Boolean  @default(false)
+  status      String   @default("pending") // pending, paid, late, carried_over
   amount      Float    @default(0)
+  carryOver   Float    @default(0) // accumulated debt from previous periods
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

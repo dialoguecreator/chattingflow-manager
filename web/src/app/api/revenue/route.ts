@@ -70,6 +70,7 @@ export async function GET(req: Request) {
             return {
                 modelId: model.id,
                 modelName: model.name,
+                clientName: (model as any).clientName || null,
                 totalSales,
                 totalChargebacks,
                 netRevenue,
