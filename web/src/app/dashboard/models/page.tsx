@@ -6,27 +6,37 @@ import { useRouter } from 'next/navigation';
 
 function fmt(n: number) { return n.toFixed(2); }
 
-const CLIENT_PERIODS = [
-    { value: '7d', label: 'Last 7 Days' },
-    { value: '14d', label: 'Last 14 Days' },
-    { value: '30d', label: 'Last 30 Days' },
-    { value: 'custom', label: 'Custom' },
-];
-
-function getPeriodDates(period: string, customFrom?: string, customTo?: string) {
-    if (period === 'custom' && customFrom && customTo) {
-        return { startDate: customFrom, endDate: customTo };
-    }
+// Generate weekly periods: Monday 18:00 CET to next Monday 18:00 CET
+function generateWeeklyPeriods(count: number = 8) {
+    const periods: { label: string; startDate: string; endDate: string }[] = [];
     const now = new Date();
-    const ms: Record<string, number> = {
-        '24h': 24 * 60 * 60 * 1000,
-        '7d': 7 * 24 * 60 * 60 * 1000,
-        '14d': 14 * 24 * 60 * 60 * 1000,
-        '30d': 30 * 24 * 60 * 60 * 1000,
-    };
-    const diff = ms[period] || ms['7d'];
-    const from = new Date(now.getTime() - diff);
-    return { startDate: from.toISOString(), endDate: now.toISOString() };
+    const currentDay = now.getUTCDay();
+    const daysBack = currentDay === 0 ? 6 : currentDay === 1 ? 0 : currentDay - 1;
+
+    const latestMonday = new Date(now);
+    latestMonday.setUTCDate(now.getUTCDate() - daysBack);
+    latestMonday.setUTCHours(17, 0, 0, 0); // 18:00 CET = 17:00 UTC
+
+    if (latestMonday > now) {
+        latestMonday.setUTCDate(latestMonday.getUTCDate() - 7);
+    }
+
+    for (let i = 0; i < count; i++) {
+        const start = new Date(latestMonday);
+        start.setUTCDate(latestMonday.getUTCDate() - (i * 7));
+        const end = new Date(start);
+        end.setUTCDate(start.getUTCDate() + 7);
+
+        const formatDate = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const isCurrent = now >= start && now <= end;
+
+        periods.push({
+            label: `${formatDate(start)} – ${formatDate(end)}${isCurrent ? ' (Current)' : ''}`,
+            startDate: start.toISOString(),
+            endDate: end.toISOString(),
+        });
+    }
+    return periods;
 }
 
 function getWeekPeriod(date: Date = new Date()) {
@@ -59,9 +69,8 @@ export default function ModelsPage() {
     const [addError, setAddError] = useState('');
 
     // Client section state
-    const [clientPeriod, setClientPeriod] = useState('7d');
-    const [customFrom, setCustomFrom] = useState('');
-    const [customTo, setCustomTo] = useState('');
+    const [weeklyPeriods] = useState(generateWeeklyPeriods(8));
+    const [selectedWeek, setSelectedWeek] = useState(0);
     const [clientSummary, setClientSummary] = useState<any[]>([]);
     const [clientPayments, setClientPayments] = useState<Record<string, boolean>>({});
     const [clientSummaryLoading, setClientSummaryLoading] = useState(false);
@@ -104,10 +113,12 @@ export default function ModelsPage() {
 
     // Load client summary
     const loadClientSummary = useCallback(() => {
-        if (clientPeriod === 'custom' && (!customFrom || !customTo)) return;
+        if (weeklyPeriods.length === 0) return;
 
         setClientSummaryLoading(true);
-        const { startDate, endDate } = getPeriodDates(clientPeriod, customFrom, customTo);
+        const period = weeklyPeriods[selectedWeek];
+        const startDate = period.startDate;
+        const endDate = period.endDate;
 
         Promise.all([
             fetch(`/api/clients/summary?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`).then(r => r.json()),
@@ -123,7 +134,7 @@ export default function ModelsPage() {
             setClientPayments(payMap);
             setClientSummaryLoading(false);
         }).catch(() => setClientSummaryLoading(false));
-    }, [clientPeriod, customFrom, customTo]);
+    }, [selectedWeek, weeklyPeriods]);
 
     useEffect(() => { loadClientSummary(); }, [loadClientSummary]);
 
@@ -278,7 +289,9 @@ export default function ModelsPage() {
     };
 
     const togglePayment = async (clientName: string, paid: boolean) => {
-        const { startDate, endDate } = getPeriodDates(clientPeriod, customFrom, customTo);
+        const period = weeklyPeriods[selectedWeek];
+        const startDate = period.startDate;
+        const endDate = period.endDate;
         const client = clientSummary.find(c => c.clientName === clientName);
         const amount = client?.totalCommission || 0;
 
@@ -498,28 +511,22 @@ export default function ModelsPage() {
                                 Grouped models by client with revenue totals and payment tracking.
                             </p>
                         </div>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                            <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>📅</span>
-                            {CLIENT_PERIODS.map(p => (
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}>📅 Weekly Period:</span>
+                            {weeklyPeriods.slice(0, 6).map((p, i) => (
                                 <button
-                                    key={p.value}
-                                    onClick={() => setClientPeriod(p.value)}
+                                    key={i}
+                                    onClick={() => setSelectedWeek(i)}
                                     style={{
-                                        padding: '5px 12px',
+                                        padding: '6px 14px',
                                         borderRadius: 'var(--radius-md)',
-                                        border: clientPeriod === p.value
-                                            ? '1px solid var(--accent-primary)'
-                                            : '1px solid var(--border-primary)',
-                                        background: clientPeriod === p.value
-                                            ? 'rgba(139, 92, 246, 0.15)'
-                                            : 'var(--bg-secondary)',
-                                        color: clientPeriod === p.value
-                                            ? 'var(--accent-primary)'
-                                            : 'var(--text-secondary)',
-                                        fontSize: 12,
-                                        fontWeight: clientPeriod === p.value ? 600 : 400,
+                                        border: selectedWeek === i ? '2px solid var(--accent-primary)' : '1px solid var(--border-primary)',
+                                        background: selectedWeek === i ? 'rgba(139, 92, 246, 0.2)' : 'var(--bg-glass)',
+                                        color: selectedWeek === i ? 'var(--accent-primary)' : 'var(--text-secondary)',
                                         cursor: 'pointer',
-                                        transition: 'all 0.2s ease',
+                                        fontSize: 13,
+                                        fontWeight: selectedWeek === i ? 600 : 400,
+                                        transition: 'all 150ms ease',
                                     }}
                                 >
                                     {p.label}
@@ -527,44 +534,9 @@ export default function ModelsPage() {
                             ))}
                         </div>
                     </div>
-
-                    {/* Custom date range */}
-                    {clientPeriod === 'custom' && (
-                        <div style={{
-                            display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16,
-                            padding: '12px 16px', borderRadius: 'var(--radius-md)',
-                            background: 'rgba(139, 92, 246, 0.05)', border: '1px solid rgba(139, 92, 246, 0.15)',
-                        }}>
-                            <div>
-                                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>From</label>
-                                <input
-                                    type="datetime-local"
-                                    className="form-input"
-                                    style={{ fontSize: 13, padding: '6px 10px' }}
-                                    value={customFrom}
-                                    onChange={e => setCustomFrom(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>To</label>
-                                <input
-                                    type="datetime-local"
-                                    className="form-input"
-                                    style={{ fontSize: 13, padding: '6px 10px' }}
-                                    value={customTo}
-                                    onChange={e => setCustomTo(e.target.value)}
-                                />
-                            </div>
-                            <button
-                                className="btn btn-sm btn-primary"
-                                style={{ marginTop: 18 }}
-                                onClick={loadClientSummary}
-                                disabled={!customFrom || !customTo}
-                            >
-                                Apply
-                            </button>
-                        </div>
-                    )}
+                    <div style={{ marginBottom: 12, fontSize: 12, color: 'var(--text-muted)' }}>
+                        Monday 18:00 CET → Monday 18:00 CET (7-day billing cycle)
+                    </div>
 
                     {clientSummaryLoading ? (
                         <p className="text-muted">Loading client data...</p>
