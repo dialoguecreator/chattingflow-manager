@@ -4,6 +4,14 @@ import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
+const PERIODS = [
+    { value: 'all', label: 'All Time' },
+    { value: '24h', label: 'Last 24h' },
+    { value: '7d', label: 'Last 7 Days' },
+    { value: '14d', label: 'Last 14 Days' },
+    { value: '30d', label: 'Last 30 Days' },
+];
+
 export default function DashboardPage() {
     const { data: session, status } = useSession();
     const router = useRouter();
@@ -11,14 +19,15 @@ export default function DashboardPage() {
     const [recentInvoices, setRecentInvoices] = useState<any[]>([]);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [period, setPeriod] = useState('all');
 
     useEffect(() => {
         if (status === 'unauthenticated') router.push('/login');
     }, [status, router]);
 
     useEffect(() => {
-        fetch('/api/dashboard/stats').then(r => r.json()).then(setStats).catch(() => { });
-    }, []);
+        fetch(`/api/dashboard/stats?period=${period}`).then(r => r.json()).then(setStats).catch(() => { });
+    }, [period]);
 
     useEffect(() => {
         fetch(`/api/invoices?page=${page}&limit=10`)
@@ -36,12 +45,47 @@ export default function DashboardPage() {
         <>
             <header className="main-header">
                 <h1 className="page-title">Dashboard</h1>
-                <span className="text-sm text-muted">Welcome back, {session?.user?.name}</span>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span className="text-sm text-muted">Welcome back, {session?.user?.name}</span>
+                </div>
             </header>
             <div className="main-body">
+                {/* Period Filter */}
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    marginBottom: 16, flexWrap: 'wrap',
+                }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>📅 Period:</span>
+                    {PERIODS.map(p => (
+                        <button
+                            key={p.value}
+                            onClick={() => setPeriod(p.value)}
+                            style={{
+                                padding: '6px 14px',
+                                borderRadius: 'var(--radius-md)',
+                                border: period === p.value
+                                    ? '1px solid var(--accent-primary)'
+                                    : '1px solid var(--border-primary)',
+                                background: period === p.value
+                                    ? 'rgba(139, 92, 246, 0.15)'
+                                    : 'var(--bg-secondary)',
+                                color: period === p.value
+                                    ? 'var(--accent-primary)'
+                                    : 'var(--text-secondary)',
+                                fontSize: 13,
+                                fontWeight: period === p.value ? 600 : 400,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                            }}
+                        >
+                            {p.label}
+                        </button>
+                    ))}
+                </div>
+
                 <div className="stats-grid">
                     <div className="stat-card">
-                        <div className="stat-label">Total Revenue (This Period)</div>
+                        <div className="stat-label">Total Revenue {period !== 'all' ? `(${PERIODS.find(p => p.value === period)?.label})` : '(All Time)'}</div>
                         <div className="stat-value">${stats?.totalRevenue?.toFixed(2) || '0.00'}</div>
                     </div>
                     <div className="stat-card">
@@ -53,7 +97,7 @@ export default function DashboardPage() {
                         <div className="stat-value">{stats?.totalChatters || 0}</div>
                     </div>
                     <div className="stat-card">
-                        <div className="stat-label">Total Invoices</div>
+                        <div className="stat-label">Total Invoices {period !== 'all' ? `(${PERIODS.find(p => p.value === period)?.label})` : '(All Time)'}</div>
                         <div className="stat-value">{stats?.totalInvoices || 0}</div>
                     </div>
                 </div>

@@ -12,13 +12,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     const { id } = await params;
     try {
-        const { commission, status, name } = await req.json();
+        const { commission, status, name, clientName } = await req.json();
         const model = await prisma.onlyFansModel.update({
             where: { id: parseInt(id) },
             data: {
                 ...(commission !== undefined && { commission: parseFloat(commission) }),
                 ...(status !== undefined && { status }),
                 ...(name !== undefined && { name }),
+                ...(clientName !== undefined && { clientName: clientName || null }),
             },
         });
         return NextResponse.json({ model });

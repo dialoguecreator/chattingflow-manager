@@ -63,6 +63,7 @@ model OnlyFansModel {
   guildId         Int
   discordCategoryId String?
   commission      Float    @default(0) // Net commission percentage (e.g. 22 = 22%)
+  clientName      String?  // Client who manages/holds this model
   status          String   @default("ACTIVE") // ACTIVE, PAUSED, ARCHIVED
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -344,6 +345,20 @@ model MilkReport {
   reviewer User?         @relation("MilkReviewer", fields: [reviewedById], references: [id])
   model    OnlyFansModel @relation(fields: [modelId], references: [id])
   guild    Guild         @relation(fields: [guildId], references: [id])
+}
+
+// ─── Client Payments ──────────────────────────────────────
+model ClientPayment {
+  id          Int      @id @default(autoincrement())
+  clientName  String
+  periodStart DateTime
+  periodEnd   DateTime
+  paid        Boolean  @default(false)
+  amount      Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([clientName, periodStart, periodEnd])
 }
 
 // ─── Settings ─────────────────────────────────────────────

@@ -1,10 +1,47 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
 function fmt(n: number) { return n.toFixed(2); }
+
+const CLIENT_PERIODS = [
+    { value: '7d', label: 'Last 7 Days' },
+    { value: '14d', label: 'Last 14 Days' },
+    { value: '30d', label: 'Last 30 Days' },
+    { value: 'custom', label: 'Custom' },
+];
+
+function getPeriodDates(period: string, customFrom?: string, customTo?: string) {
+    if (period === 'custom' && customFrom && customTo) {
+        return { startDate: customFrom, endDate: customTo };
+    }
+    const now = new Date();
+    const ms: Record<string, number> = {
+        '24h': 24 * 60 * 60 * 1000,
+        '7d': 7 * 24 * 60 * 60 * 1000,
+        '14d': 14 * 24 * 60 * 60 * 1000,
+        '30d': 30 * 24 * 60 * 60 * 1000,
+    };
+    const diff = ms[period] || ms['7d'];
+    const from = new Date(now.getTime() - diff);
+    return { startDate: from.toISOString(), endDate: now.toISOString() };
+}
+
+function getWeekPeriod(date: Date = new Date()) {
+    // Week = Monday 00:00 to Sunday 23:59
+    const d = new Date(date);
+    const day = d.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    const monday = new Date(d);
+    monday.setDate(d.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+    return { start: monday, end: sunday };
+}
 
 export default function ModelsPage() {
     const { data: session, status } = useSession();
@@ -12,7 +49,7 @@ export default function ModelsPage() {
     const [models, setModels] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [editingModel, setEditingModel] = useState<any | null>(null);
-    const [editForm, setEditForm] = useState({ name: '', commission: '' });
+    const [editForm, setEditForm] = useState({ name: '', commission: '', clientName: '' });
     const [revenueData, setRevenueData] = useState<any>({});
     const [confirmDelete, setConfirmDelete] = useState<any | null>(null);
     const [confirmArchive, setConfirmArchive] = useState<any | null>(null);
@@ -20,6 +57,18 @@ export default function ModelsPage() {
     const [showAddModel, setShowAddModel] = useState(false);
     const [newModelName, setNewModelName] = useState('');
     const [addError, setAddError] = useState('');
+
+    // Client section state
+    const [clientPeriod, setClientPeriod] = useState('7d');
+    const [customFrom, setCustomFrom] = useState('');
+    const [customTo, setCustomTo] = useState('');
+    const [clientSummary, setClientSummary] = useState<any[]>([]);
+    const [clientPayments, setClientPayments] = useState<Record<string, boolean>>({});
+    const [clientSummaryLoading, setClientSummaryLoading] = useState(false);
+
+    // Inline client name editing
+    const [editingClientId, setEditingClientId] = useState<number | null>(null);
+    const [editingClientValue, setEditingClientValue] = useState('');
 
     const userRole = (session?.user as any)?.role || '';
 
@@ -44,11 +93,37 @@ export default function ModelsPage() {
         });
     };
 
+    // Load client summary
+    const loadClientSummary = useCallback(() => {
+        if (clientPeriod === 'custom' && (!customFrom || !customTo)) return;
+
+        setClientSummaryLoading(true);
+        const { startDate, endDate } = getPeriodDates(clientPeriod, customFrom, customTo);
+
+        Promise.all([
+            fetch(`/api/clients/summary?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`).then(r => r.json()),
+            fetch(`/api/clients/payments?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`).then(r => r.json()),
+        ]).then(([summaryData, paymentsData]) => {
+            setClientSummary(summaryData.clients || []);
+
+            // Build payments lookup
+            const payMap: Record<string, boolean> = {};
+            (paymentsData.payments || []).forEach((p: any) => {
+                payMap[p.clientName] = p.paid;
+            });
+            setClientPayments(payMap);
+            setClientSummaryLoading(false);
+        }).catch(() => setClientSummaryLoading(false));
+    }, [clientPeriod, customFrom, customTo]);
+
+    useEffect(() => { loadClientSummary(); }, [loadClientSummary]);
+
     const openEdit = (model: any) => {
         setEditingModel(model);
         setEditForm({
             name: model.name || '',
             commission: model.commission?.toString() || '0',
+            clientName: model.clientName || '',
         });
     };
 
@@ -58,7 +133,7 @@ export default function ModelsPage() {
             const res = await fetch(`/api/models/${editingModel.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: editForm.name, commission: editForm.commission }),
+                body: JSON.stringify({ name: editForm.name, commission: editForm.commission, clientName: editForm.clientName }),
             });
             if (!res.ok) {
                 const data = await res.json();
@@ -67,6 +142,20 @@ export default function ModelsPage() {
             }
             setEditingModel(null);
             loadData();
+            setTimeout(loadClientSummary, 300);
+        } catch { alert('Network error'); }
+    };
+
+    const saveInlineClient = async (modelId: number) => {
+        try {
+            await fetch(`/api/models/${modelId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ clientName: editingClientValue }),
+            });
+            setEditingClientId(null);
+            loadData();
+            setTimeout(loadClientSummary, 300);
         } catch { alert('Network error'); }
     };
 
@@ -116,6 +205,27 @@ export default function ModelsPage() {
         } catch { setAddError('Network error'); }
     };
 
+    const togglePayment = async (clientName: string, paid: boolean) => {
+        const { startDate, endDate } = getPeriodDates(clientPeriod, customFrom, customTo);
+        const client = clientSummary.find(c => c.clientName === clientName);
+        const amount = client?.totalCommission || 0;
+
+        try {
+            await fetch('/api/clients/payments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    clientName,
+                    periodStart: startDate,
+                    periodEnd: endDate,
+                    paid,
+                    amount,
+                }),
+            });
+            setClientPayments(prev => ({ ...prev, [clientName]: paid }));
+        } catch { alert('Network error'); }
+    };
+
     if (userRole !== 'ADMIN') return null;
 
     const activeModels = models.filter(m => m.status === 'ACTIVE');
@@ -150,6 +260,7 @@ export default function ModelsPage() {
                                 <thead>
                                     <tr>
                                         <th>Model</th>
+                                        <th>Client</th>
                                         <th>Net Commission</th>
                                         <th>Total Sales (All-Time)</th>
                                         <th>Commission Earnings</th>
@@ -166,6 +277,52 @@ export default function ModelsPage() {
                                             <tr key={m.id}>
                                                 <td>
                                                     <span className="badge badge-primary" style={{ fontSize: 14 }}>{m.name}</span>
+                                                </td>
+                                                <td>
+                                                    {editingClientId === m.id ? (
+                                                        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                                            <input
+                                                                className="form-input"
+                                                                style={{ padding: '4px 8px', fontSize: 13, width: 120 }}
+                                                                value={editingClientValue}
+                                                                onChange={e => setEditingClientValue(e.target.value)}
+                                                                onKeyDown={e => {
+                                                                    if (e.key === 'Enter') saveInlineClient(m.id);
+                                                                    if (e.key === 'Escape') setEditingClientId(null);
+                                                                }}
+                                                                autoFocus
+                                                                placeholder="Client name..."
+                                                            />
+                                                            <button
+                                                                className="btn btn-sm btn-primary"
+                                                                style={{ padding: '2px 8px', fontSize: 12 }}
+                                                                onClick={() => saveInlineClient(m.id)}
+                                                            >✓</button>
+                                                            <button
+                                                                className="btn btn-sm btn-secondary"
+                                                                style={{ padding: '2px 8px', fontSize: 12 }}
+                                                                onClick={() => setEditingClientId(null)}
+                                                            >✕</button>
+                                                        </div>
+                                                    ) : (
+                                                        <span
+                                                            style={{
+                                                                cursor: 'pointer',
+                                                                color: m.clientName ? 'var(--text-primary)' : 'var(--text-muted)',
+                                                                fontStyle: m.clientName ? 'normal' : 'italic',
+                                                                fontSize: 13,
+                                                                borderBottom: '1px dashed var(--border-primary)',
+                                                                paddingBottom: 1,
+                                                            }}
+                                                            onClick={() => {
+                                                                setEditingClientId(m.id);
+                                                                setEditingClientValue(m.clientName || '');
+                                                            }}
+                                                            title="Click to edit client"
+                                                        >
+                                                            {m.clientName || '— set client'}
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td>
                                                     <span style={{
@@ -193,6 +350,7 @@ export default function ModelsPage() {
                                 <tfoot>
                                     <tr style={{ borderTop: '2px solid var(--border-primary)' }}>
                                         <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>TOTALS</td>
+                                        <td></td>
                                         <td></td>
                                         <td style={{ fontWeight: 700, color: 'var(--success)' }}>
                                             ${fmt(activeModels.reduce((s, m) => s + (revenueData[m.id]?.totalSales || 0), 0))}
@@ -255,6 +413,196 @@ export default function ModelsPage() {
                     </div>
                 )}
 
+                {/* ═══════════════════════════════════════════════════════════════ */}
+                {/* CLIENT SUMMARY SECTION */}
+                {/* ═══════════════════════════════════════════════════════════════ */}
+                <div className="card" style={{ marginTop: 32 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+                        <div>
+                            <h2 style={{ margin: 0, fontWeight: 700, fontSize: 20, color: 'var(--text-primary)' }}>
+                                👥 Client Summary & Payments
+                            </h2>
+                            <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: 13 }}>
+                                Grouped models by client with revenue totals and payment tracking.
+                            </p>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                            <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>📅</span>
+                            {CLIENT_PERIODS.map(p => (
+                                <button
+                                    key={p.value}
+                                    onClick={() => setClientPeriod(p.value)}
+                                    style={{
+                                        padding: '5px 12px',
+                                        borderRadius: 'var(--radius-md)',
+                                        border: clientPeriod === p.value
+                                            ? '1px solid var(--accent-primary)'
+                                            : '1px solid var(--border-primary)',
+                                        background: clientPeriod === p.value
+                                            ? 'rgba(139, 92, 246, 0.15)'
+                                            : 'var(--bg-secondary)',
+                                        color: clientPeriod === p.value
+                                            ? 'var(--accent-primary)'
+                                            : 'var(--text-secondary)',
+                                        fontSize: 12,
+                                        fontWeight: clientPeriod === p.value ? 600 : 400,
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                    }}
+                                >
+                                    {p.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Custom date range */}
+                    {clientPeriod === 'custom' && (
+                        <div style={{
+                            display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16,
+                            padding: '12px 16px', borderRadius: 'var(--radius-md)',
+                            background: 'rgba(139, 92, 246, 0.05)', border: '1px solid rgba(139, 92, 246, 0.15)',
+                        }}>
+                            <div>
+                                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>From</label>
+                                <input
+                                    type="datetime-local"
+                                    className="form-input"
+                                    style={{ fontSize: 13, padding: '6px 10px' }}
+                                    value={customFrom}
+                                    onChange={e => setCustomFrom(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>To</label>
+                                <input
+                                    type="datetime-local"
+                                    className="form-input"
+                                    style={{ fontSize: 13, padding: '6px 10px' }}
+                                    value={customTo}
+                                    onChange={e => setCustomTo(e.target.value)}
+                                />
+                            </div>
+                            <button
+                                className="btn btn-sm btn-primary"
+                                style={{ marginTop: 18 }}
+                                onClick={loadClientSummary}
+                                disabled={!customFrom || !customTo}
+                            >
+                                Apply
+                            </button>
+                        </div>
+                    )}
+
+                    {clientSummaryLoading ? (
+                        <p className="text-muted">Loading client data...</p>
+                    ) : clientSummary.length > 0 ? (
+                        <div className="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style={{ width: 40 }}>Paid</th>
+                                        <th>Client</th>
+                                        <th>Models</th>
+                                        <th>Total Revenue</th>
+                                        <th>Total Commission (Payout)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {clientSummary.map((client: any) => (
+                                        <tr key={client.clientName}>
+                                            <td>
+                                                <label style={{
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    cursor: 'pointer', position: 'relative',
+                                                }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={clientPayments[client.clientName] || false}
+                                                        onChange={e => togglePayment(client.clientName, e.target.checked)}
+                                                        style={{ display: 'none' }}
+                                                    />
+                                                    <span style={{
+                                                        width: 24, height: 24, borderRadius: 'var(--radius-sm)',
+                                                        border: clientPayments[client.clientName]
+                                                            ? '2px solid var(--success)'
+                                                            : '2px solid var(--border-primary)',
+                                                        background: clientPayments[client.clientName]
+                                                            ? 'rgba(34, 197, 94, 0.15)'
+                                                            : 'transparent',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        fontSize: 14, transition: 'all 0.15s ease',
+                                                    }}>
+                                                        {clientPayments[client.clientName] ? '✓' : ''}
+                                                    </span>
+                                                </label>
+                                            </td>
+                                            <td>
+                                                <span style={{
+                                                    fontWeight: 600, fontSize: 15,
+                                                    color: clientPayments[client.clientName]
+                                                        ? 'var(--success)'
+                                                        : 'var(--text-primary)',
+                                                }}>
+                                                    {client.clientName}
+                                                </span>
+                                                {clientPayments[client.clientName] && (
+                                                    <span style={{
+                                                        marginLeft: 8, fontSize: 11, padding: '2px 8px',
+                                                        borderRadius: 'var(--radius-sm)', fontWeight: 600,
+                                                        background: 'rgba(34, 197, 94, 0.15)', color: 'var(--success)',
+                                                    }}>PAID</span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                                    {client.models.map((m: any) => (
+                                                        <span
+                                                            key={m.id}
+                                                            className="badge badge-primary"
+                                                            style={{ fontSize: 11, padding: '2px 8px' }}
+                                                        >
+                                                            {m.name}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </td>
+                                            <td style={{ color: 'var(--success)', fontWeight: 600 }}>
+                                                ${fmt(client.totalRevenue)}
+                                            </td>
+                                            <td style={{ fontWeight: 700, fontSize: 16, color: 'var(--accent-primary)' }}>
+                                                ${fmt(client.totalCommission)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr style={{ borderTop: '2px solid var(--border-primary)' }}>
+                                        <td></td>
+                                        <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>TOTALS</td>
+                                        <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                                            {clientSummary.reduce((s: number, c: any) => s + c.models.length, 0)} models
+                                        </td>
+                                        <td style={{ fontWeight: 700, color: 'var(--success)' }}>
+                                            ${fmt(clientSummary.reduce((s: number, c: any) => s + c.totalRevenue, 0))}
+                                        </td>
+                                        <td style={{ fontWeight: 700, fontSize: 16, color: 'var(--accent-primary)' }}>
+                                            ${fmt(clientSummary.reduce((s: number, c: any) => s + c.totalCommission, 0))}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    ) : (
+                        <div className="empty-state">
+                            <div className="empty-state-icon">👥</div>
+                            <div className="empty-state-text">
+                                No clients assigned yet. Set a client name on models above to see them grouped here.
+                            </div>
+                        </div>
+                    )}
+                </div>
+
                 {/* Edit Model Modal */}
                 {editingModel && (
                     <div className="modal-overlay" onClick={() => setEditingModel(null)}>
@@ -263,6 +611,18 @@ export default function ModelsPage() {
                             <div className="form-group">
                                 <label className="form-label">Model Name</label>
                                 <input className="form-input" value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Client Name</label>
+                                <input
+                                    className="form-input"
+                                    value={editForm.clientName}
+                                    onChange={e => setEditForm({ ...editForm, clientName: e.target.value })}
+                                    placeholder="e.g. John's Agency"
+                                />
+                                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+                                    The client/partner who holds this model. Models with the same client name will be grouped in the Client Summary.
+                                </p>
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Net Commission (%)</label>
