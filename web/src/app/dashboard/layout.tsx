@@ -14,6 +14,8 @@ const navItems = [
     { label: 'Chargebacks', href: '/dashboard/chargebacks', icon: '↩️' },
     { label: 'Mass PPVs', href: '/dashboard/mass-ppvs', icon: '📨' },
     { label: 'Models', href: '/dashboard/models', icon: '🏷️', superAdminOnly: true },
+    { section: 'OnlyMonster' },
+    { label: 'OnlyMonster', href: '/dashboard/onlymonster', icon: '👾', adminOnly: true },
     { section: 'People' },
     { label: 'Chatters', href: '/dashboard/chatters', icon: '💬' },
     { label: 'Staff', href: '/dashboard/staff', icon: '👥' },
