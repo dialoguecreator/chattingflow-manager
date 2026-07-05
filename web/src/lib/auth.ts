@@ -9,6 +9,7 @@ import { verifyTotp, consumeBackupCode } from '@/lib/totp';
 // surfaces the thrown Error message as `result.error` when redirect: false.
 export const TWO_FACTOR_REQUIRED = '2FA_REQUIRED';
 export const INVALID_2FA = 'INVALID_2FA';
+export const ACCOUNT_FIRED = 'ACCOUNT_FIRED';
 
 async function recordAttempt(data: {
     userId: number | null;
@@ -66,9 +67,10 @@ export const authOptions: AuthOptions = {
                 }
 
                 // Fired accounts are locked out (e.g. a former partner/employee).
+                // Throw a signal so the login page can show a custom message.
                 if (user.status === 'FIRED') {
                     await recordAttempt({ userId: user.id, email, success: false, reason: 'FIRED', ip, userAgent });
-                    return null;
+                    throw new Error(ACCOUNT_FIRED);
                 }
 
                 const valid = await compare(credentials.password, user.password);
