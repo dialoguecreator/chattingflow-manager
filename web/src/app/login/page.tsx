@@ -33,7 +33,7 @@ export default function LoginPage() {
             } else if (result.error === 'INVALID_2FA') {
                 setError('Invalid 2FA code. Enter the current 6-digit code or a backup code.');
             } else if (result.error === 'ACCOUNT_FIRED') {
-                setError('Kibo jebi se - Deni');
+                setError('Error 404');
             } else {
                 setError('Invalid email or password');
             }
