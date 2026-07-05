@@ -1,9 +1,9 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 
 const navItems = [
     { label: 'Overview', href: '/dashboard', icon: '📊' },
@@ -30,10 +30,32 @@ const navItems = [
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
     const pathname = usePathname();
+    const router = useRouter();
     const { data: session } = useSession();
     const userRole = (session?.user as any)?.role || '';
     const isAdminOrManager = userRole === 'ADMIN' || userRole === 'MANAGER';
     const isAdmin = userRole === 'ADMIN';
+
+    // 2FA is mandatory for everyone: any logged-in account without it is forced
+    // to the setup page and can't use the rest of the app until it's enabled.
+    const twoFactorEnabled = (session?.user as any)?.twoFactorEnabled;
+    const needsTwoFactorSetup = !!session && twoFactorEnabled === false;
+    const onSecurityPage = pathname === '/dashboard/security';
+
+    useEffect(() => {
+        if (needsTwoFactorSetup && !onSecurityPage) {
+            router.replace('/dashboard/security');
+        }
+    }, [needsTwoFactorSetup, onSecurityPage, router]);
+
+    // Block rendering other pages while a mandatory 2FA setup is pending.
+    if (needsTwoFactorSetup && !onSecurityPage) {
+        return (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--text-secondary)' }}>
+                Redirecting to two-factor setup…
+            </div>
+        );
+    }
 
     return (
         <div className="app-layout">

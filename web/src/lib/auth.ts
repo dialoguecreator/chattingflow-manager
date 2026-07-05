@@ -125,13 +125,16 @@ export const authOptions: AuthOptions = {
             if (user) {
                 token.userId = parseInt(user.id);
             }
-            // Always refresh role from DB so role changes take effect immediately
+            // Always refresh role + 2FA status from DB so changes take effect immediately
             if (token.userId) {
                 const dbUser = await prisma.user.findUnique({
                     where: { id: token.userId },
-                    select: { role: true },
+                    select: { role: true, twoFactorEnabled: true },
                 });
-                if (dbUser) token.role = dbUser.role;
+                if (dbUser) {
+                    token.role = dbUser.role;
+                    token.twoFactorEnabled = dbUser.twoFactorEnabled;
+                }
             }
             return token;
         },
@@ -139,6 +142,7 @@ export const authOptions: AuthOptions = {
             if (session.user) {
                 session.user.role = token.role;
                 session.user.id = token.userId;
+                session.user.twoFactorEnabled = token.twoFactorEnabled;
             }
             return session;
         },
