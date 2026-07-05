@@ -23,9 +23,14 @@ model User {
   discordId       String?  @unique
   discordUsername  String?
   inviteToken     String?  // null = activated
+  // Two-factor authentication (TOTP)
+  twoFactorEnabled     Boolean @default(false)
+  twoFactorSecret      String?           // base32 TOTP secret, null until enrolled
+  twoFactorBackupCodes String  @default("[]") // JSON array of bcrypt-hashed one-time backup codes
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  loginAudits        LoginAudit[]
   clockRecords       ClockRecord[]
   invoices           Invoice[]
   breakRecords       BreakRecord[]
@@ -383,4 +388,25 @@ model Setting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// ─── Security / Login Audit ───────────────────────────────
+// Records every login attempt (success and failure) with the source IP
+// and device (user-agent), so account access can be reviewed and abuse
+// traced. Data source for the "Login Activity" (devices & IP) view.
+// Only records attempts made AFTER this was deployed — no historical data.
+model LoginAudit {
+  id          Int      @id @default(autoincrement())
+  userId      Int?     // null when the email didn't match any account
+  email       String   // the email that was attempted
+  success     Boolean  @default(false)
+  reason      String?  // OK, BAD_PASSWORD, NO_SUCH_USER, NOT_ACTIVATED, FIRED, NO_2FA, BAD_2FA
+  ipAddress   String   @default("unknown")
+  userAgent   String   @default("unknown")
+  createdAt   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([createdAt])
 }
