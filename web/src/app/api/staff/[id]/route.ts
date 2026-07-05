@@ -59,6 +59,12 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
+        // Ban the underlying user account so a removed staff member can no longer
+        // access the platform at all — not just disappear from the staff list.
+        const staff = await prisma.staff.findUnique({ where: { id: staffId } });
+        if (staff) {
+            await prisma.user.update({ where: { id: staff.userId }, data: { status: 'FIRED' } });
+        }
         await prisma.staff.delete({ where: { id: staffId } });
         return NextResponse.json({ success: true });
     } catch (error) {

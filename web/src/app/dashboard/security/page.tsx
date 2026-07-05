@@ -85,6 +85,15 @@ export default function SecurityPage() {
                     get into your account.
                 </p>
 
+                {!loading && !enabled && (
+                    <div className="card" style={{ marginBottom: 16, borderColor: '#ef4444' }}>
+                        <strong style={{ color: '#ef4444' }}>⚠️ Two-factor authentication is required.</strong>
+                        <p className="text-muted" style={{ margin: '6px 0 0' }}>
+                            You must set up 2FA below before you can use the rest of the dashboard.
+                        </p>
+                    </div>
+                )}
+
                 {loading ? <div className="card">Loading…</div> : (
                     <>
                         <div className="card" style={{ marginBottom: 16 }}>
@@ -115,6 +124,10 @@ export default function SecurityPage() {
                                         <div key={c} style={{ padding: '6px 10px', background: 'rgba(255,255,255,0.05)', borderRadius: 6 }}>{c}</div>
                                     ))}
                                 </div>
+                                {/* Full navigation so the session token refreshes and the mandatory-2FA gate clears. */}
+                                <a href="/dashboard" className="btn btn-primary" style={{ marginTop: 16, display: 'inline-block' }}>
+                                    I&apos;ve saved my codes — continue
+                                </a>
                             </div>
                         )}
 
