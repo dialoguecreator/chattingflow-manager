@@ -23,6 +23,9 @@ const navItems = [
     { section: 'Settings' },
     { label: 'Settings', href: '/dashboard/settings', icon: '⚙️', adminOnly: true },
     { label: 'Invite Member', href: '/dashboard/invite', icon: '🔗', adminOnly: true },
+    { section: 'Security' },
+    { label: 'Two-Factor Auth', href: '/dashboard/security', icon: '🔐' },
+    { label: 'Login Activity', href: '/dashboard/security/activity', icon: '🛰️', auditAdmin: true },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -69,6 +72,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                         }
                         // Hide admin-only items for non-admin/non-manager users
                         if (item.adminOnly && !isAdminOrManager) {
+                            return null;
+                        }
+                        // Login Activity: visible to founders, admins, and managers
+                        if ((item as any).auditAdmin && !['FOUNDER', 'ADMIN', 'MANAGER'].includes(userRole)) {
                             return null;
                         }
                         const isActive = pathname === item.href ||
