@@ -61,7 +61,7 @@ export default {
     async handleModal(interaction: ModalSubmitInteraction, params: string[]) {
         const [clockRecordId, modelId, guildDbId] = params.map(Number);
 
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        await interaction.deferReply({ ephemeral: true });
 
         try {
             const totalSalesStr = interaction.fields.getTextInputValue('total_sales');

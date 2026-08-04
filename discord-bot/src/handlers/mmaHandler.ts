@@ -11,7 +11,7 @@ export default {
     async handleModal(interaction: ModalSubmitInteraction, params: string[]) {
         const [modelId, guildDbId] = params.map(Number);
 
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        await interaction.deferReply({ ephemeral: true });
 
         try {
             const message = interaction.fields.getTextInputValue('mma_message');

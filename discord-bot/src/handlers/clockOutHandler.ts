@@ -63,7 +63,7 @@ export default {
         const [clockRecordId, modelId, guildDbId] = params.slice(0, 3).map(Number);
         const splitPartnerDiscordId = params[3] || null;
 
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        await interaction.deferReply({ ephemeral: true });
 
         try {
             const totalSalesStr = interaction.fields.getTextInputValue('total_sales');

@@ -87,7 +87,7 @@ export default {
     async handleModal(interaction: ModalSubmitInteraction, params: string[]) {
         const [purpose, categoryId] = params;
 
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        await interaction.deferReply({ ephemeral: true });
 
         try {
             const guild = interaction.guild!;

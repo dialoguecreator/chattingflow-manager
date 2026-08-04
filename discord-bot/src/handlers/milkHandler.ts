@@ -39,7 +39,7 @@ export default {
 
         const [modelId, guildDbId] = params.map(Number);
 
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        await interaction.deferReply({ ephemeral: true });
 
         try {
             const subscriberName = interaction.fields.getTextInputValue('subscriber_name');
@@ -338,7 +338,7 @@ export default {
     async handleRejectModal(interaction: ModalSubmitInteraction, params: string[]) {
         const milkId = parseInt(params[0]);
 
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        await interaction.deferReply({ ephemeral: true });
 
         try {
             const rejectReason = interaction.fields.getTextInputValue('reject_reason');
