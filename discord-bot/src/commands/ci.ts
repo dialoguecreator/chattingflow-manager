@@ -12,7 +12,7 @@ export default {
 
         if (!('name' in channel) || channel.name !== 'clock-in-and-out') {
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ This command can only be used in a `#clock-in-and-out` channel.');
-            return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
         const guild = interaction.guild!;
@@ -22,13 +22,13 @@ export default {
             const dbGuild = await prisma.guild.findUnique({ where: { guildId: guild.id } });
             if (!dbGuild) {
                 const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Guild not set up.');
-                return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+                return interaction.reply({ embeds: [embed], ephemeral: true });
             }
 
             const parentChannel = 'parent' in channel ? channel.parent : null;
             if (!parentChannel) {
                 const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Cannot determine model.');
-                return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+                return interaction.reply({ embeds: [embed], ephemeral: true });
             }
 
             const model = await prisma.onlyFansModel.findFirst({
@@ -36,7 +36,7 @@ export default {
             });
             if (!model) {
                 const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Model not found.');
-                return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+                return interaction.reply({ embeds: [embed], ephemeral: true });
             }
 
             let user = await prisma.user.findUnique({ where: { discordId: discordUserId } });
@@ -63,7 +63,7 @@ export default {
                 const embed = new EmbedBuilder()
                     .setColor(0xEF4444)
                     .setDescription(`❌ You are already clocked in on **${model.name}**! Clock out first with \`/co\`.`);
-                return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+                return interaction.reply({ embeds: [embed], ephemeral: true });
             }
 
             const shift = getCurrentShift();
@@ -95,7 +95,7 @@ export default {
         } catch (error) {
             console.error('Clock-in error:', error);
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ An error occurred during clock-in.');
-            await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            await interaction.reply({ embeds: [embed], ephemeral: true });
         }
     },
 };

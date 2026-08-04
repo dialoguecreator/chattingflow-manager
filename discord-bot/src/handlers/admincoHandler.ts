@@ -110,7 +110,7 @@ export default {
                     .setColor(0xEF4444)
                     .setTitle('❌ Admin Clock-Out Cancelled')
                     .setDescription('No sales tracker file was uploaded in time.\nUse `/adminco` again to retry.');
-                return interaction.followUp({ embeds: [cancelEmbed], flags: MessageFlags.Ephemeral });
+                return interaction.followUp({ embeds: [cancelEmbed], ephemeral: true });
             }
 
             const uploadedMessage = collected.first()!;
@@ -207,7 +207,7 @@ export default {
                 .setColor(0x22C55E)
                 .setTitle('✅ Admin Clock-Out Complete')
                 .setDescription(`**${clockRecord.user.firstName} ${clockRecord.user.lastName}** has been clocked out from **${clockRecord.model.name}**.`);
-            await interaction.followUp({ embeds: [confirmEmbed], flags: MessageFlags.Ephemeral });
+            await interaction.followUp({ embeds: [confirmEmbed], ephemeral: true });
 
             // DM the chatter about the clock-out
             try {

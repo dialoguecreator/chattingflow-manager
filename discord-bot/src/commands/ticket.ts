@@ -14,7 +14,7 @@ export default {
         const channelName = ('name' in channel ? channel.name : '') || '';
         if (!channelName.endsWith('-update') && channelName !== 'milk') {
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ This command can only be used in a model update channel (e.g. `#lara-update`) or `#milk`.');
-            return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
         const selectMenu = new StringSelectMenuBuilder()
@@ -39,7 +39,7 @@ export default {
         await interaction.reply({
             embeds: [embed],
             components: [row],
-            flags: MessageFlags.Ephemeral,
+            ephemeral: true,
         });
     },
 };

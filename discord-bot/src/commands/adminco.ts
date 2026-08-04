@@ -22,7 +22,7 @@ export default {
             const embed = new EmbedBuilder()
                 .setColor(0xEF4444)
                 .setDescription('❌ Only Supervisors/Managers/Admins can use this command.');
-            return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
         // Must be used in #clock-in-and-out channel
@@ -30,7 +30,7 @@ export default {
             const embed = new EmbedBuilder()
                 .setColor(0xEF4444)
                 .setDescription('❌ This command can only be used in a `#clock-in-and-out` channel.');
-            return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
         const guild = interaction.guild!;
@@ -39,13 +39,13 @@ export default {
             const dbGuild = await prisma.guild.findUnique({ where: { guildId: guild.id } });
             if (!dbGuild) {
                 const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Guild not set up.');
-                return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral });
+                return interaction.reply({ embeds: [e], ephemeral: true });
             }
 
             const parentChannel = 'parent' in channel ? channel.parent : null;
             if (!parentChannel) {
                 const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Cannot determine model.');
-                return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral });
+                return interaction.reply({ embeds: [e], ephemeral: true });
             }
 
             const model = await prisma.onlyFansModel.findFirst({
@@ -53,7 +53,7 @@ export default {
             });
             if (!model) {
                 const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Model not found.');
-                return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral });
+                return interaction.reply({ embeds: [e], ephemeral: true });
             }
 
             // Find all chatters currently clocked in on this model
@@ -70,7 +70,7 @@ export default {
                 const embed = new EmbedBuilder()
                     .setColor(0xEF4444)
                     .setDescription(`❌ No chatters are currently clocked in on **${model.name}**.`);
-                return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+                return interaction.reply({ embeds: [embed], ephemeral: true });
             }
 
             // Build select menu to choose which chatter to clock out
@@ -102,13 +102,13 @@ export default {
             await interaction.reply({
                 embeds: [embed],
                 components: [row],
-                flags: MessageFlags.Ephemeral,
+                ephemeral: true,
             });
 
         } catch (error) {
             console.error('Admin clock-out error:', error);
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ An error occurred.');
-            await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            await interaction.reply({ embeds: [embed], ephemeral: true });
         }
     },
 };

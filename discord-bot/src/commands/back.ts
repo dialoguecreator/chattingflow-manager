@@ -12,7 +12,7 @@ export default {
 
         if (!('name' in channel) || channel.name !== 'break') {
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ This command can only be used in a `#break` channel.');
-            return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
         const guild = interaction.guild!;
@@ -20,28 +20,28 @@ export default {
 
         try {
             const dbGuild = await prisma.guild.findUnique({ where: { guildId: guild.id } });
-            if (!dbGuild) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Guild not set up.'); return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral }); }
+            if (!dbGuild) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Guild not set up.'); return interaction.reply({ embeds: [e], ephemeral: true }); }
 
             const parentChannel = 'parent' in channel ? channel.parent : null;
-            if (!parentChannel) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Cannot determine model.'); return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral }); }
+            if (!parentChannel) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Cannot determine model.'); return interaction.reply({ embeds: [e], ephemeral: true }); }
 
             const model = await prisma.onlyFansModel.findFirst({
                 where: { discordCategoryId: parentChannel.id, guildId: dbGuild.id },
             });
-            if (!model) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Model not found.'); return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral }); }
+            if (!model) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Model not found.'); return interaction.reply({ embeds: [e], ephemeral: true }); }
 
             const user = await prisma.user.findUnique({ where: { discordId: discordUserId } });
-            if (!user) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ User not found.'); return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral }); }
+            if (!user) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ User not found.'); return interaction.reply({ embeds: [e], ephemeral: true }); }
 
             const clockRecord = await prisma.clockRecord.findFirst({
                 where: { userId: user.id, modelId: model.id, status: 'ACTIVE' },
             });
-            if (!clockRecord) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ You are not clocked in.'); return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral }); }
+            if (!clockRecord) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ You are not clocked in.'); return interaction.reply({ embeds: [e], ephemeral: true }); }
 
             const activeBreak = await prisma.breakRecord.findFirst({
                 where: { clockRecordId: clockRecord.id, endTime: null },
             });
-            if (!activeBreak) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ You are not currently on a break.'); return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral }); }
+            if (!activeBreak) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ You are not currently on a break.'); return interaction.reply({ embeds: [e], ephemeral: true }); }
 
             const now = new Date();
             const breakDuration = now.getTime() - activeBreak.startTime.getTime();
@@ -73,7 +73,7 @@ export default {
         } catch (error) {
             console.error('Back error:', error);
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ An error occurred.');
-            await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            await interaction.reply({ embeds: [embed], ephemeral: true });
         }
     },
 };

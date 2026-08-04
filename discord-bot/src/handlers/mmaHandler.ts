@@ -178,7 +178,7 @@ export default {
         );
         if (!hasPermission) {
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Only Supervisors/Managers/Admins can do this.');
-            return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
         try {
@@ -188,11 +188,11 @@ export default {
             });
             if (!mma) {
                 const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Request not found.');
-                return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+                return interaction.reply({ embeds: [embed], ephemeral: true });
             }
             if (mma.status !== 'PENDING') {
                 const embed = new EmbedBuilder().setColor(0xEF4444).setDescription(`❌ Already ${mma.status.toLowerCase()}.`);
-                return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+                return interaction.reply({ embeds: [embed], ephemeral: true });
             }
 
             const reviewer = await prisma.user.findUnique({ where: { discordId: interaction.user.id } });
@@ -241,7 +241,7 @@ export default {
         } catch (error) {
             console.error('MMA button error:', error);
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ An error occurred.');
-            await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            await interaction.reply({ embeds: [embed], ephemeral: true });
         }
     },
 };

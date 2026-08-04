@@ -112,7 +112,7 @@ export default {
                     .setColor(0xEF4444)
                     .setTitle('❌ Clock-Out Cancelled')
                     .setDescription('You did not upload a sales tracker file in time.\nUse `/co` again to retry.');
-                return interaction.followUp({ embeds: [cancelEmbed], flags: MessageFlags.Ephemeral });
+                return interaction.followUp({ embeds: [cancelEmbed], ephemeral: true });
             }
 
             const uploadedMessage = collected.first()!;
@@ -252,7 +252,7 @@ export default {
                 .setColor(0x22C55E)
                 .setTitle('✅ Clock-Out Complete')
                 .setDescription('Your sales tracker has been saved and sent to the sales-file channel.');
-            await interaction.followUp({ embeds: [confirmEmbed], flags: MessageFlags.Ephemeral });
+            await interaction.followUp({ embeds: [confirmEmbed], ephemeral: true });
 
             // DM earnings
             try {

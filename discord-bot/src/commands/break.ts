@@ -16,7 +16,7 @@ export default {
 
         if (!('name' in channel) || channel.name !== 'break') {
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ This command can only be used in a `#break` channel.');
-            return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
         const guild = interaction.guild!;
@@ -24,34 +24,34 @@ export default {
 
         try {
             const dbGuild = await prisma.guild.findUnique({ where: { guildId: guild.id } });
-            if (!dbGuild) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Guild not set up.'); return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral }); }
+            if (!dbGuild) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Guild not set up.'); return interaction.reply({ embeds: [e], ephemeral: true }); }
 
             const parentChannel = 'parent' in channel ? channel.parent : null;
-            if (!parentChannel) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Cannot determine model.'); return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral }); }
+            if (!parentChannel) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Cannot determine model.'); return interaction.reply({ embeds: [e], ephemeral: true }); }
 
             const model = await prisma.onlyFansModel.findFirst({
                 where: { discordCategoryId: parentChannel.id, guildId: dbGuild.id },
             });
-            if (!model) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Model not found.'); return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral }); }
+            if (!model) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Model not found.'); return interaction.reply({ embeds: [e], ephemeral: true }); }
 
             const user = await prisma.user.findUnique({ where: { discordId: discordUserId } });
-            if (!user) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ You need to clock in first.'); return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral }); }
+            if (!user) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ You need to clock in first.'); return interaction.reply({ embeds: [e], ephemeral: true }); }
 
             const clockRecord = await prisma.clockRecord.findFirst({
                 where: { userId: user.id, modelId: model.id, status: 'ACTIVE' },
             });
-            if (!clockRecord) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ You are not clocked in. Use `/ci` first.'); return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral }); }
+            if (!clockRecord) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ You are not clocked in. Use `/ci` first.'); return interaction.reply({ embeds: [e], ephemeral: true }); }
 
             const activeBreak = await prisma.breakRecord.findFirst({
                 where: { clockRecordId: clockRecord.id, endTime: null },
             });
-            if (activeBreak) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ You are already on a break! Use `/back` to return.'); return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral }); }
+            if (activeBreak) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ You are already on a break! Use `/back` to return.'); return interaction.reply({ embeds: [e], ephemeral: true }); }
 
             const breakCount = await prisma.breakRecord.count({ where: { clockRecordId: clockRecord.id } });
-            if (breakCount >= MAX_BREAKS) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription(`❌ You have already used your maximum ${MAX_BREAKS} breaks for this shift.`); return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral }); }
+            if (breakCount >= MAX_BREAKS) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription(`❌ You have already used your maximum ${MAX_BREAKS} breaks for this shift.`); return interaction.reply({ embeds: [e], ephemeral: true }); }
 
             const breakCheck = canTakeBreak(clockRecord.clockIn, clockRecord.shiftType || 'MORNING');
-            if (!breakCheck.allowed) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription(`❌ ${breakCheck.reason}`); return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral }); }
+            if (!breakCheck.allowed) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription(`❌ ${breakCheck.reason}`); return interaction.reply({ embeds: [e], ephemeral: true }); }
 
             const breakRecord = await prisma.breakRecord.create({
                 data: {
@@ -114,7 +114,7 @@ export default {
         } catch (error) {
             console.error('Break error:', error);
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ An error occurred.');
-            await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            await interaction.reply({ embeds: [embed], ephemeral: true });
         }
     },
 };

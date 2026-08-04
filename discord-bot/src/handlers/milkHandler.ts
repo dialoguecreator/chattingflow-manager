@@ -220,7 +220,7 @@ export default {
             const successEmbed = new EmbedBuilder()
                 .setColor(0x22C55E)
                 .setDescription(`✅ Your milk report for **${subscriberName}** has been submitted and is pending review!`);
-            await interaction.followUp({ embeds: [successEmbed], flags: MessageFlags.Ephemeral });
+            await interaction.followUp({ embeds: [successEmbed], ephemeral: true });
 
         } catch (error) {
             console.error('Milk modal error:', error);
@@ -239,7 +239,7 @@ export default {
         );
         if (!hasPermission) {
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Only Supervisors/Managers/Admins can approve or reject milk reports.');
-            return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
         try {
@@ -249,11 +249,11 @@ export default {
             });
             if (!milk) {
                 const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Milk report not found.');
-                return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+                return interaction.reply({ embeds: [embed], ephemeral: true });
             }
             if (milk.status !== 'PENDING') {
                 const embed = new EmbedBuilder().setColor(0xEF4444).setDescription(`❌ This report has already been ${milk.status.toLowerCase()}.`);
-                return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+                return interaction.reply({ embeds: [embed], ephemeral: true });
             }
 
             if (action === 'milk_approve') {
@@ -331,7 +331,7 @@ export default {
         } catch (error) {
             console.error('Milk button error:', error);
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ An error occurred.');
-            await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            await interaction.reply({ embeds: [embed], ephemeral: true });
         }
     },
 

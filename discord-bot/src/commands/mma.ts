@@ -15,16 +15,16 @@ export default {
 
         try {
             const dbGuild = await prisma.guild.findUnique({ where: { guildId: guild.id } });
-            if (!dbGuild) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Guild not set up.'); return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral }); }
+            if (!dbGuild) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Guild not set up.'); return interaction.reply({ embeds: [e], ephemeral: true }); }
 
             const channel = interaction.channel!;
             const parentChannel = 'parent' in channel ? channel.parent : null;
-            if (!parentChannel) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Use this in a model category channel.'); return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral }); }
+            if (!parentChannel) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Use this in a model category channel.'); return interaction.reply({ embeds: [e], ephemeral: true }); }
 
             const model = await prisma.onlyFansModel.findFirst({
                 where: { discordCategoryId: parentChannel.id, guildId: dbGuild.id },
             });
-            if (!model) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Model not found.'); return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral }); }
+            if (!model) { const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Model not found.'); return interaction.reply({ embeds: [e], ephemeral: true }); }
 
             const modal = new ModalBuilder()
                 .setCustomId(`mma_modal:${model.id}:${dbGuild.id}`)
@@ -46,7 +46,7 @@ export default {
         } catch (error) {
             console.error('MMA error:', error);
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ An error occurred.');
-            await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            await interaction.reply({ embeds: [embed], ephemeral: true });
         }
     },
 };

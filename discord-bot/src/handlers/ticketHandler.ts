@@ -60,7 +60,7 @@ export default {
         const config = TICKET_MODALS[purpose];
         if (!config) {
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Invalid option.');
-            return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
         const channel = interaction.channel!;
@@ -253,7 +253,7 @@ export default {
         );
         if (!hasPermission) {
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Only Supervisors/Managers/Admins can do this.');
-            return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
         try {
@@ -263,11 +263,11 @@ export default {
             });
             if (!ticket) {
                 const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Ticket not found.');
-                return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+                return interaction.reply({ embeds: [embed], ephemeral: true });
             }
             if (ticket.status !== 'OPEN') {
                 const embed = new EmbedBuilder().setColor(0xEF4444).setDescription(`❌ Ticket already ${ticket.status.toLowerCase()}.`);
-                return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+                return interaction.reply({ embeds: [embed], ephemeral: true });
             }
 
             const status = action === 'ticket_approve' ? 'APPROVED' : 'REJECTED';
@@ -309,7 +309,7 @@ export default {
         } catch (error) {
             console.error('Ticket button error:', error);
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ An error occurred.');
-            await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            await interaction.reply({ embeds: [embed], ephemeral: true });
         }
     },
 };

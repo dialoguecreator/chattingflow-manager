@@ -18,7 +18,7 @@ export default {
             const embed = new EmbedBuilder()
                 .setColor(0xEF4444)
                 .setDescription('❌ This command can only be used in a `#milk` channel.');
-            return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
         const guild = interaction.guild!;
@@ -27,13 +27,13 @@ export default {
             const dbGuild = await prisma.guild.findUnique({ where: { guildId: guild.id } });
             if (!dbGuild) {
                 const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Guild not set up.');
-                return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral });
+                return interaction.reply({ embeds: [e], ephemeral: true });
             }
 
             const parentChannel = 'parent' in channel ? channel.parent : null;
             if (!parentChannel) {
                 const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Use this in a model category channel.');
-                return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral });
+                return interaction.reply({ embeds: [e], ephemeral: true });
             }
 
             const model = await prisma.onlyFansModel.findFirst({
@@ -41,7 +41,7 @@ export default {
             });
             if (!model) {
                 const e = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Model not found for this category.');
-                return interaction.reply({ embeds: [e], flags: MessageFlags.Ephemeral });
+                return interaction.reply({ embeds: [e], ephemeral: true });
             }
 
             // Build modal with 5 fields (max allowed by Discord)
@@ -99,7 +99,7 @@ export default {
         } catch (error) {
             console.error('Milk command error:', error);
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ An error occurred.');
-            await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            await interaction.reply({ embeds: [embed], ephemeral: true });
         }
     },
 };

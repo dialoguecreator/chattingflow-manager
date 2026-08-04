@@ -25,7 +25,7 @@ export default {
     async execute(interaction: ChatInputCommandInteraction) {
         const discordUserId = interaction.user.id;
 
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        await interaction.deferReply({ ephemeral: true });
 
         try {
             // Find the user in DB

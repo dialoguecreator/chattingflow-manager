@@ -17,7 +17,7 @@ export default {
 
         if (!hasManagementRole(member)) {
             const embed = new EmbedBuilder().setColor(0xEF4444).setDescription('❌ Only Founders, Admins, and Managers can use this command.');
-            return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
         const modelName = interaction.options.getString('name', true);
