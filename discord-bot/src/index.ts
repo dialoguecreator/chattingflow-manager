@@ -59,6 +59,7 @@ if (fs.existsSync(eventsPath)) {
 // Handle slash command interactions
 client.on(Events.InteractionCreate, async (interaction) => {
     // Slash commands
+    console.log();
     if (interaction.isChatInputCommand()) {
         const command = client.commands.get(interaction.commandName);
         if (!command) return;
